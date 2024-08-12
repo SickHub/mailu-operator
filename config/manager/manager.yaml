@@ -57,6 +57,14 @@ spec:
         - /manager
         args:
         - --leader-elect
+        env:
+          - name: MAILU_URL
+            value: "http://mailu-front:80/api/v1"
+          - name: MAILU_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: api-token
+                name: mailu-api
         image: controller:latest
         name: manager
         securityContext:

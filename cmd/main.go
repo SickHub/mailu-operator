@@ -22,6 +22,8 @@ import (
 	"flag"
 	"os"
 
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -69,7 +71,7 @@ func main() {
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.StringVar(&mailuServer, "mailu-server", "mailu-front:80/api/v1/", "Mailu server address")
+	flag.StringVar(&mailuServer, "mailu-server", "http://mailu-front:80/api/v1/", "Mailu API server address")
 	flag.StringVar(&mailuToken, "mailu-token", "", "Mailu API token")
 	opts := zap.Options{
 		Development: true,
@@ -77,12 +79,20 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// allow overwriting Mailu server/token via ENV
+	if val, ok := os.LookupEnv("MAILU_URL"); ok {
+		mailuServer = val
+	}
+	if val, ok := os.LookupEnv("MAILU_TOKEN"); ok {
+		mailuToken = val
+	}
+
 	if mailuServer == "" || mailuToken == "" {
 		setupLog.Error(errors.New("missing MailU API server address or token"), "invalid configuration")
 		os.Exit(1)
 	}
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -126,6 +136,10 @@ func main() {
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
+		Cache: cache.Options{
+			// TODO: how to use current namespace?
+			DefaultNamespaces: map[string]cache.Config{"mail": {}},
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -138,7 +152,7 @@ func main() {
 		ApiURL:   mailuServer,
 		ApiToken: mailuToken,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Domain")
+		setupLog.Error(err, "unable to create domain controller", "controller", "Domain")
 		os.Exit(1)
 	}
 	if err = (&controller.UserReconciler{
@@ -147,7 +161,7 @@ func main() {
 		ApiURL:   mailuServer,
 		ApiToken: mailuToken,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "User")
+		setupLog.Error(err, "unable to create user controller", "controller", "User")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

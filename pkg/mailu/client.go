@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/oapi-codegen/runtime"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Alias defines model for Alias.
@@ -106,7 +107,7 @@ type User struct {
 	// EnablePop Allow email retrieval via POP3
 	EnablePop *bool `json:"enable_pop,omitempty"`
 
-	// Enabled Enable the user. When an user is disabled, the user is unable to login to the Admin GUI or webmail or access his email via IMAP/POP3 or send mail
+	// Enabled Enable the user
 	Enabled            *bool     `json:"enabled,omitempty"`
 	ForwardDestination *[]string `json:"forward_destination,omitempty"`
 
@@ -119,7 +120,7 @@ type User struct {
 	// GlobalAdmin Make the user a global administrator
 	GlobalAdmin *bool `json:"global_admin,omitempty"`
 
-	// Password Hash of the user's password; Example='$bcrypt-sha256$v=2,t=2b,r=12$fmsAdJbYAD1gGQIE5nfJq.$zLkQUEs2XZfTpAEpcix/1k5UTNPm0jO'
+	// Password Hash of the user's password
 	Password *string `json:"password,omitempty"`
 
 	// QuotaBytes The maximum quota for the user’s email box in bytes
@@ -248,7 +249,8 @@ func (c *Client) CreateDomain(ctx context.Context, body Domain, reqEditors ...Re
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateDomain(ctx context.Context, domain string, body Domain, reqEditors ...RequestEditorFn) (*http.Response, error) {
+// UpdateDomain updates the domain with the given body.
+func (c *Client) UpdateDomain(ctx context.Context, domain string, body Domain, reqEditors ...RequestEditorFn) (*http.Response, error) { //nolint:lll
 	req, err := NewUpdateDomainRequest(c.Server, domain, body)
 	if err != nil {
 		return nil, err
@@ -260,7 +262,7 @@ func (c *Client) UpdateDomain(ctx context.Context, domain string, body Domain, r
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteDomain(ctx context.Context, domain string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) DeleteDomain(ctx context.Context, domain string, reqEditors ...RequestEditorFn) (*http.Response, error) { //nolint:lll
 	req, err := NewDeleteDomainRequest(c.Server, domain)
 	if err != nil {
 		return nil, err
@@ -326,7 +328,7 @@ func NewCreateDomainRequestWithBody(server string, contentType string, body io.R
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/domain")
+	operationPath := "/domain"
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -358,7 +360,7 @@ func NewUpdateDomainRequest(server string, domain string, body Domain) (*http.Re
 }
 
 // NewUpdateDomainRequestWithBody generates requests for UpdateDomain with any type of body
-func NewUpdateDomainRequestWithBody(server string, domain string, contentType string, body io.Reader) (*http.Request, error) {
+func NewUpdateDomainRequestWithBody(server string, domain string, contentType string, body io.Reader) (*http.Request, error) { //nolint:lll
 	var err error
 
 	var pathParam0 string

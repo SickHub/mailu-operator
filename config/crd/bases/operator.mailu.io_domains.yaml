@@ -56,7 +56,6 @@ spec:
               signupEnabled:
                 type: boolean
             required:
-            - maxAliases
             - name
             type: object
           status:

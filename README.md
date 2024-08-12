@@ -1,6 +1,8 @@
 # mailu-operator
-// TODO(user): Add simple overview of use/purpose
 The purpose of this project is to define Email Domains, Users and Aliases used in Mailu via CRs.
+
+The Mailu-Operator uses the Mailu API to create/update/delete Domains, Users and Aliases, it therefore needs the API 
+endpoint and token which can be set through command line or the environment variables `MAILU_SERVER` and `MAILU_TOKEN`.
 
 ## Description
 // TODO(user): An in-depth paragraph about your project and overview of use
@@ -24,7 +26,7 @@ flowchart LR
 operator-sdk init --plugins=go/v4 --domain mailu.io --repo gitlab.rootcrew.net/rootcrew/services/mailu-operator
 operator-sdk create api --group operator --version v1alpha1 --kind Domain --resource --controller
 operator-sdk create api --group operator --version v1alpha1 --kind User --resource --controller
-operator-sdk create api --group operator --version v1alpha1 --kind Alias --resource --controller
+#operator-sdk create api --group operator --version v1alpha1 --kind Alias --resource --controller
 ```
 
 ### Prerequisites
