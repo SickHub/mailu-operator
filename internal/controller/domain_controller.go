@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -75,7 +76,11 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		req.Header.Add("Authorization", "Bearer "+r.ApiToken)
 		return nil
 	}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-		logr.Info(fmt.Sprintf("request: %+v", req))
+		if req.Body != nil {
+			body, _ := io.ReadAll(req.Body) //nolint:errcheck
+			req.Body = io.NopCloser(bytes.NewBuffer(body))
+			logr.Info(fmt.Sprintf("request %s: %s", req.Method, body))
+		}
 		return nil
 	}))
 	if err != nil {
@@ -178,6 +183,21 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			if reflect.DeepEqual(foundDom, dom) {
 				return ctrl.Result{}, nil
 			}
+
+			// only apply missing "alternatives" or the request will fail
+			m := make(map[string]bool)
+			alts := []string{}
+
+			for _, val := range *foundDom.Alternatives {
+				m[val] = true
+			}
+
+			for _, alt := range *dom.Alternatives {
+				if _, ok := m[alt]; !ok {
+					alts = append(alts, alt)
+				}
+			}
+			dom.Alternatives = &alts
 
 			response, err = api.UpdateDomain(ctx, domain.Spec.Name, dom)
 			if err != nil {
