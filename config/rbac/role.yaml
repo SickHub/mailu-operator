@@ -1,0 +1,58 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - operator.mailu.io
+  resources:
+  - domains
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - operator.mailu.io
+  resources:
+  - domains/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - operator.mailu.io
+  resources:
+  - domains/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - operator.mailu.io
+  resources:
+  - users
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - operator.mailu.io
+  resources:
+  - users/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - operator.mailu.io
+  resources:
+  - users/status
+  verbs:
+  - get
+  - patch
+  - update
