@@ -29,7 +29,7 @@ type DomainSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	MaxUsers int `json:"maxUsers,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	MaxAliases int `json:"maxAliases,omitemtpy"`
+	MaxAliases int `json:"maxAliases,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	MaxQuotaBytes int `json:"maxQuotaBytes,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=spec

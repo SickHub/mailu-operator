@@ -18,13 +18,17 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"reflect"
+
 	"gitlab.rootcrew.net/rootcrew/services/mailu-operator/pkg/mailu"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"net/http"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -58,8 +62,8 @@ type DomainReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
-func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { //nolint:gocyclo
+	logr := log.FromContext(ctx)
 
 	domain := &operatorv1alpha1.Domain{}
 	err := r.Get(ctx, req.NamespacedName, domain)
@@ -70,9 +74,33 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	api, err := mailu.NewClient(r.ApiURL, mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
 		req.Header.Add("Authorization", "Bearer "+r.ApiToken)
 		return nil
+	}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+		logr.Info(fmt.Sprintf("request: %+v", req))
+		return nil
 	}))
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	find, err := api.FindDomain(ctx, domain.Spec.Name)
+	if err != nil {
+		return ctrl.Result{Requeue: true}, err
+	}
+	defer find.Body.Close() //nolint:errcheck
+
+	// handle generic errors
+	switch find.StatusCode {
+	case http.StatusForbidden:
+		return ctrl.Result{}, errors.New("invalid authorization")
+
+	case http.StatusUnauthorized:
+		return ctrl.Result{}, errors.New("missing authorization")
+
+	case http.StatusBadRequest:
+		return ctrl.Result{}, errors.New("bad request")
+
+	case http.StatusServiceUnavailable:
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	if domain.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -86,16 +114,8 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 
 		// not deleted -> ensure the domain exists
-		res, err := api.FindDomain(ctx, domain.Spec.Name)
-		if err != nil {
-			return ctrl.Result{Requeue: true}, err
-		}
-
 		var response *http.Response
-		switch res.StatusCode {
-		case http.StatusServiceUnavailable:
-			return ctrl.Result{Requeue: true}, nil
-
+		switch find.StatusCode {
 		case http.StatusNotFound:
 			response, err = api.CreateDomain(ctx, mailu.Domain{
 				Name:          domain.Spec.Name,
@@ -106,13 +126,45 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				SignupEnabled: &domain.Spec.SignupEnabled,
 				Alternatives:  &domain.Spec.Alternatives,
 			})
-			if response.StatusCode != http.StatusOK {
-				return ctrl.Result{Requeue: true}, errors.New(fmt.Sprintf("failed to create domain: %d %s", response.StatusCode, response.Body))
+			if err != nil {
+				return ctrl.Result{}, err
 			}
-			meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Created", Message: "Domain created"})
+			defer response.Body.Close() //nolint:errcheck
+
+			body, err := io.ReadAll(response.Body)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			switch response.StatusCode {
+			case http.StatusBadRequest:
+				return ctrl.Result{}, errors.New("bad request")
+			case http.StatusConflict:
+				return ctrl.Result{}, fmt.Errorf("conflicting domain / alternative during create: %d %s", response.StatusCode, body)
+			case http.StatusOK:
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Created", Message: "Domain created"})
+				err = r.Status().Update(ctx, domain)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
+				return ctrl.Result{}, nil
+			default:
+				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to create domain: %d %s", response.StatusCode, body)
+			}
 
 		case http.StatusOK:
-			response, err = api.UpdateDomain(ctx, domain.Spec.Name, mailu.Domain{
+			body, err := io.ReadAll(find.Body)
+			if err != nil {
+				return ctrl.Result{Requeue: true}, err
+			}
+
+			foundDom := mailu.Domain{}
+			err = json.Unmarshal(body, &foundDom)
+			if err != nil {
+				return ctrl.Result{Requeue: true}, err
+			}
+
+			dom := mailu.Domain{
 				Name:          domain.Spec.Name,
 				Comment:       &domain.Spec.Comment,
 				MaxUsers:      &domain.Spec.MaxUsers,
@@ -120,39 +172,50 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				MaxQuotaBytes: &domain.Spec.MaxQuotaBytes,
 				SignupEnabled: &domain.Spec.SignupEnabled,
 				Alternatives:  &domain.Spec.Alternatives,
-			})
-			if response.StatusCode != http.StatusOK {
-				return ctrl.Result{Requeue: true}, errors.New(fmt.Sprintf("failed to update domain: %d %s", response.StatusCode, response.Body))
 			}
-			meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Domain updated"})
+
+			// no change
+			if reflect.DeepEqual(foundDom, dom) {
+				return ctrl.Result{}, nil
+			}
+
+			response, err = api.UpdateDomain(ctx, domain.Spec.Name, dom)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			defer response.Body.Close() //nolint:errcheck
+
+			body, err = io.ReadAll(response.Body)
+			if err != nil {
+				return ctrl.Result{Requeue: true}, err
+			}
+
+			switch response.StatusCode {
+			case http.StatusBadRequest:
+				return ctrl.Result{}, errors.New("bad request")
+			case http.StatusConflict:
+				return ctrl.Result{}, fmt.Errorf("conflicting domain / alternative during update: %d %s", response.StatusCode, body)
+			case http.StatusOK:
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Domain updated"})
+				err = r.Status().Update(ctx, domain)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
+				return ctrl.Result{}, nil
+			default:
+				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update domain: %d %s", response.StatusCode, body)
+			}
 
 		default:
-			fmt.Printf("Error, unexpected status code: %d\n", res.StatusCode)
-			return ctrl.Result{}, nil
-		}
-		err = r.Status().Update(ctx, domain)
-		if err != nil {
-			return ctrl.Result{Requeue: true}, err
-		}
-
-		if err != nil {
+			err = errors.New("unexpected status code")
+			logr.Error(err, fmt.Sprintf("unexpected status code: %d", find.StatusCode))
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, nil
 	}
 
 	if controllerutil.ContainsFinalizer(domain, finalizerName) {
 		// Domain removed -> delete
-		res, err := api.FindDomain(ctx, domain.Spec.Name)
-		if err != nil {
-			return ctrl.Result{Requeue: true}, err
-		}
-
-		if res.StatusCode == http.StatusServiceUnavailable {
-			return ctrl.Result{Requeue: true}, nil
-		}
-
-		if res.StatusCode != http.StatusNotFound {
+		if find.StatusCode != http.StatusNotFound {
 			res, err := api.DeleteDomain(ctx, domain.Spec.Name)
 			if err != nil {
 				return ctrl.Result{Requeue: true}, err
@@ -164,7 +227,6 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 		controllerutil.RemoveFinalizer(domain, finalizerName)
 		if err := r.Update(ctx, domain); err != nil {
-			//log.Error(err, "Unable to remove finalizer and update Tenant")
 			return ctrl.Result{}, err
 		}
 	}

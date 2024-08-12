@@ -19,6 +19,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+
 	"github.com/go-chi/chi/v5"
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/ginkgo/v2"
@@ -27,8 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"net/http"
-	"net/http/httptest"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	operatorv1alpha1 "gitlab.rootcrew.net/rootcrew/services/mailu-operator/api/v1alpha1"
@@ -148,13 +149,13 @@ var _ = Describe("Domain Controller", func() {
 				})
 				Expect(err).NotTo(HaveOccurred())
 
-				k8sClient.Get(ctx, typeNamespacedName, domain)
+				k8sClient.Get(ctx, typeNamespacedName, domain) //nolint:errcheck
 				Expect(domain.Status.Conditions).ToNot(BeEmpty())
 				Expect(domain.ObjectMeta.Finalizers).ToNot(BeEmpty())
 
 				// delete the resource
 				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-				k8sClient.Get(ctx, typeNamespacedName, domain)
+				k8sClient.Get(ctx, typeNamespacedName, domain) //nolint:errcheck
 				Expect(domain.ObjectMeta.DeletionTimestamp).ToNot(BeNil())
 			}
 		})
@@ -195,10 +196,10 @@ func mailuMock() string {
 	mux.Get("/domain", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("get request: %+v\n", r)
 		response := []mailu.DomainDetails{
-			mailu.DomainDetails{
+			{
 				Name: "example.com",
 			},
-			mailu.DomainDetails{
+			{
 				Name: "foo.example.com",
 			},
 		}
@@ -212,7 +213,7 @@ func mailuMock() string {
 		}
 
 		_, err = w.Write(body)
-		//require.NoError(t, err)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	// get specific domain
@@ -231,7 +232,7 @@ func mailuMock() string {
 		}
 
 		_, err = w.Write(body)
-		//require.NoError(t, err)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	mux.Get("/domain/nonexistent.com", func(w http.ResponseWriter, r *http.Request) {
@@ -247,7 +248,7 @@ func mailuMock() string {
 
 		w.WriteHeader(http.StatusNotFound)
 		_, err = w.Write(body)
-		//require.NoError(t, err)
+		Expect(err).To(HaveOccurred())
 	})
 
 	// create domain
@@ -263,6 +264,7 @@ func mailuMock() string {
 		}
 
 		_, err = w.Write(body)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	// update domain
@@ -278,6 +280,7 @@ func mailuMock() string {
 		}
 
 		_, err = w.Write(body)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	// delete domain
@@ -293,6 +296,7 @@ func mailuMock() string {
 		}
 
 		_, err = w.Write(body)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	httpSrv := httptest.NewServer(mux)
