@@ -1,0 +1,15 @@
+apiVersion: operator.mailu.io/v1alpha1
+kind: Domain
+metadata:
+  labels:
+    app.kubernetes.io/name: mailu-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: domain-sample
+spec:
+  name: example.com
+  comment: "example.com domain"
+  maxUsers: -1
+  maxAliases: -1
+  maxQuotaBytes: -1
+  signupEnabled: false
+  alternatives: []

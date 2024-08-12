@@ -1,0 +1,34 @@
+apiVersion: operator.mailu.io/v1alpha1
+kind: User
+metadata:
+  labels:
+    app.kubernetes.io/name: mailu-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: user-sample
+spec:
+  # --> email: $name@$domain
+  # allowSpoofing: false
+  changePassword: false
+  comment: "test user"
+  displayedName: "test@example.com"
+  domain: example.com
+  # enabled: true
+  enableIMAP: false
+  enablePOP: false
+  # forwardEnabled: false
+  # forwardDestination: "test@example.com"
+  # forwardKeep: false
+  # globalAdmin: false
+  name: test
+  quotaBytes: -1
+  # rawPassword: "s3cr3t!"
+  passwordSecret: "user-secret"
+  passwordKey: "test_example.com"
+  # replyEnabled: false
+  # replySubject: "subject"
+  # replyBody: "body"
+  # replyStartDate: "2021-01-31"
+  # replyEndDate: "2021-02-01"
+  # spamEnabled: true
+  # spamMarkAsRead: true
+  # spamThreshold: 80
