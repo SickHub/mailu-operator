@@ -27,7 +27,7 @@ import (
 	"gitlab.rootcrew.net/rootcrew/services/mailu-operator/test/utils"
 )
 
-const namespace = "mailu-operator-system"
+const namespace = "mailu-operator"
 
 var _ = Describe("controller", Ordered, func() {
 	BeforeAll(func() {

@@ -56,7 +56,9 @@ spec:
               enabled:
                 type: boolean
               forwardDestination:
-                type: string
+                items:
+                  type: string
+                type: array
               forwardEnabled:
                 type: boolean
               forwardKeep:
@@ -68,18 +70,21 @@ spec:
               passwordKey:
                 type: string
               passwordSecret:
-                description: 'TODO: rename?'
                 type: string
               quotaBytes:
                 format: int64
                 type: integer
+              rawPassword:
+                type: string
               replyBody:
                 type: string
               replyEnabled:
                 type: boolean
               replyEndDate:
+                format: date
                 type: string
               replyStartDate:
+                format: date
                 type: string
               replySubject:
                 type: string
@@ -88,7 +93,6 @@ spec:
               spamMarkAsRead:
                 type: boolean
               spamThreshold:
-                format: int64
                 type: integer
             required:
             - domain

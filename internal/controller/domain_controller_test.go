@@ -18,15 +18,13 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 
 	"github.com/go-chi/chi/v5"
-	jsoniter "github.com/json-iterator/go"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"gitlab.rootcrew.net/rootcrew/services/mailu-operator/pkg/mailu"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,73 +34,8 @@ import (
 )
 
 var _ = Describe("Domain Controller", func() {
+	// TODO: unify context, use multiple "It" : https://onsi.github.io/ginkgo/
 	Context("When reconciling a created resource", func() {
-		const resourceName = "test-resource"
-
-		ctx := context.Background()
-
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		domain := &operatorv1alpha1.Domain{}
-
-		mailuMock := mailuMock()
-
-		BeforeEach(func() {
-			By("creating the custom resource for the Kind Domain")
-			err := k8sClient.Get(ctx, typeNamespacedName, domain)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &operatorv1alpha1.Domain{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					Spec: operatorv1alpha1.DomainSpec{
-						Name:          "nonexistent.com",
-						Comment:       "example domain",
-						MaxUsers:      -1,
-						MaxAliases:    -1,
-						MaxQuotaBytes: -1,
-						SignupEnabled: false,
-						Alternatives:  []string{},
-					},
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-			}
-		})
-
-		AfterEach(func() {
-			resource := &operatorv1alpha1.Domain{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Cleanup the specific resource instance Domain")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
-
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &DomainReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				ApiURL:   mailuMock,
-				ApiToken: "asdf",
-			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			domain := &operatorv1alpha1.Domain{}
-			err = k8sClient.Get(ctx, typeNamespacedName, domain)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(domain.Status.Conditions).ToNot(BeEmpty())
-		})
-	})
-
-	Context("When reconciling a deleted resource", func() {
 		const resourceName = "test-resource"
 
 		ctx := context.Background()
@@ -131,45 +64,24 @@ var _ = Describe("Domain Controller", func() {
 						MaxAliases:    -1,
 						MaxQuotaBytes: -1,
 						SignupEnabled: false,
-						Alternatives:  []string{},
+						Alternatives:  []string{"foo.example.com"},
 					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-
-				// reconcile to create the resource
-				controllerReconciler := &DomainReconciler{
-					Client:   k8sClient,
-					Scheme:   k8sClient.Scheme(),
-					ApiURL:   mailuMock,
-					ApiToken: "asdf",
-				}
-
-				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-					NamespacedName: typeNamespacedName,
-				})
-				Expect(err).NotTo(HaveOccurred())
-
-				k8sClient.Get(ctx, typeNamespacedName, domain) //nolint:errcheck
-				Expect(domain.Status.Conditions).ToNot(BeEmpty())
-				Expect(domain.ObjectMeta.Finalizers).ToNot(BeEmpty())
-
-				// delete the resource
-				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-				k8sClient.Get(ctx, typeNamespacedName, domain) //nolint:errcheck
-				Expect(domain.ObjectMeta.DeletionTimestamp).ToNot(BeNil())
 			}
 		})
 
 		AfterEach(func() {
-			// resource should not be found
 			resource := &operatorv1alpha1.Domain{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).To(HaveOccurred())
-			Expect(errors.IsNotFound(err)).To(BeTrue())
+			if err == nil {
+				By("Cleanup the specific resource instance Domain")
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			}
 		})
 
 		It("should successfully reconcile the resource", func() {
-			By("Reconciling the deleted resource")
+			By("Reconciling the created resource")
 			controllerReconciler := &DomainReconciler{
 				Client:   k8sClient,
 				Scheme:   k8sClient.Scheme(),
@@ -182,125 +94,110 @@ var _ = Describe("Domain Controller", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
+			// reconcile again to cover "update" path
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			domain := &operatorv1alpha1.Domain{}
+			err = k8sClient.Get(ctx, typeNamespacedName, domain)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(domain.Status.Conditions).ToNot(BeEmpty())
+		})
+
+		It("should successfully remove the resource", func() {
+			By("Reconciling the deleted resource")
+			err := k8sClient.Delete(ctx, domain)
+			Expect(err).NotTo(HaveOccurred())
+
+			controllerReconciler := &DomainReconciler{
+				Client:   k8sClient,
+				Scheme:   k8sClient.Scheme(),
+				ApiURL:   mailuMock,
+				ApiToken: "asdf",
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
 			domain := &operatorv1alpha1.Domain{}
 			err = k8sClient.Get(ctx, typeNamespacedName, domain)
 			Expect(err).To(HaveOccurred())
-			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("should fail without API credentials", func() {
+			By("Reconciling the resource")
+			mux := chi.NewMux()
+			mux.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"code": 401, "message":"Authorization required"}`))
+			})
+			httpSrv := httptest.NewServer(mux)
+			DeferCleanup(httpSrv.Close)
+
+			controllerReconciler := &DomainReconciler{
+				Client:   k8sClient,
+				Scheme:   k8sClient.Scheme(),
+				ApiURL:   httpSrv.URL,
+				ApiToken: "asdf",
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should fail with invalid API credentials", func() {
+			By("Reconciling the resource")
+			mux := chi.NewMux()
+			mux.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"code": 403, "message":"You are not authorized to access this resource"}`))
+			})
+			httpSrv := httptest.NewServer(mux)
+			DeferCleanup(httpSrv.Close)
+
+			controllerReconciler := &DomainReconciler{
+				Client:   k8sClient,
+				Scheme:   k8sClient.Scheme(),
+				ApiURL:   httpSrv.URL,
+				ApiToken: "asdf",
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should retry when API is unavailable", func() {
+			By("Reconciling the resource")
+			mux := chi.NewMux()
+			mux.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte(`{"code": 503, "message":"Temporarily unavailable"}`))
+			})
+			httpSrv := httptest.NewServer(mux)
+			DeferCleanup(httpSrv.Close)
+
+			controllerReconciler := &DomainReconciler{
+				Client:   k8sClient,
+				Scheme:   k8sClient.Scheme(),
+				ApiURL:   httpSrv.URL,
+				ApiToken: "asdf",
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })
-
-func mailuMock() string {
-	mux := chi.NewMux()
-	// get domains
-	mux.Get("/domain", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("get request: %+v\n", r)
-		response := []mailu.DomainDetails{
-			{
-				Name: "example.com",
-			},
-			{
-				Name: "foo.example.com",
-			},
-		}
-
-		body, err := jsoniter.Marshal(response)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(fmt.Sprintf("{\"error\":\"%v\"}", err)))
-			return
-		}
-
-		_, err = w.Write(body)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	// get specific domain
-	mux.Get("/domain/example.com", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("get request: %+v\n", r)
-
-		domain := mailu.DomainDetails{
-			Name: "example.com",
-		}
-		body, err := jsoniter.Marshal(domain)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(fmt.Sprintf("{\"error\":\"%v\"}", err)))
-			return
-		}
-
-		_, err = w.Write(body)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	mux.Get("/domain/nonexistent.com", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("get request: %+v\n", r)
-
-		body, err := jsoniter.Marshal(`{"code": 0, "message": "Not found"}`)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(fmt.Sprintf("{\"error\":\"%v\"}", err)))
-			return
-		}
-
-		w.WriteHeader(http.StatusNotFound)
-		_, err = w.Write(body)
-		Expect(err).To(HaveOccurred())
-	})
-
-	// create domain
-	mux.Post("/domain", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("post request: %+v\n", r)
-
-		body, err := jsoniter.Marshal(`{"code": 0, "message": "ok"}`)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(fmt.Sprintf("{\"error\":\"%v\"}", err)))
-			return
-		}
-
-		_, err = w.Write(body)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	// update domain
-	mux.Patch("/domain/example.com", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("patch request: %+v\n", r)
-
-		body, err := jsoniter.Marshal(`{"code": 0, "message": "ok"}`)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(fmt.Sprintf("{\"error\":\"%v\"}", err)))
-			return
-		}
-
-		_, err = w.Write(body)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	// delete domain
-	mux.Delete("/domain/example.com", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("delete request: %+v\n", r)
-
-		body, err := jsoniter.Marshal(`{"code": 0, "message": "ok"}`)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(fmt.Sprintf("{\"error\":\"%v\"}", err)))
-			return
-		}
-
-		_, err = w.Write(body)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	httpSrv := httptest.NewServer(mux)
-	//t.Cleanup(func() { httpSrv.Close() })
-
-	return httpSrv.URL
-}

@@ -56,10 +56,6 @@ type DomainReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Domain object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
@@ -76,11 +72,12 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		req.Header.Add("Authorization", "Bearer "+r.ApiToken)
 		return nil
 	}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+		body := []byte{}
 		if req.Body != nil {
-			body, _ := io.ReadAll(req.Body) //nolint:errcheck
+			body, _ = io.ReadAll(req.Body) //nolint:errcheck
 			req.Body = io.NopCloser(bytes.NewBuffer(body))
-			logr.Info(fmt.Sprintf("request %s: %s", req.Method, body))
 		}
+		logr.Info(fmt.Sprintf("request %s %s: %s", req.Method, req.URL.Path, body))
 		return nil
 	}))
 	if err != nil {
@@ -143,7 +140,13 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 			switch response.StatusCode {
 			case http.StatusBadRequest:
-				return ctrl.Result{}, errors.New("bad request")
+				// TODO: define consistent conditions/types that make sense (Created, Updated, Deleted?)
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Unavailable", Status: metav1.ConditionFalse, Reason: "Bad request", Message: "Domain creation failed"})
+				err = r.Status().Update(ctx, domain)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
+				return ctrl.Result{Requeue: false}, errors.New("bad request")
 			case http.StatusConflict:
 				return ctrl.Result{}, fmt.Errorf("conflicting domain / alternative during create: %d %s", response.StatusCode, body)
 			case http.StatusOK:
@@ -152,6 +155,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
 				}
+				logr.Info(fmt.Sprintf("domain %s created", domain.Spec.Name))
 				return ctrl.Result{}, nil
 			default:
 				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to create domain: %d %s", response.StatusCode, body)
@@ -176,7 +180,10 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				MaxAliases:    &domain.Spec.MaxAliases,
 				MaxQuotaBytes: &domain.Spec.MaxQuotaBytes,
 				SignupEnabled: &domain.Spec.SignupEnabled,
-				Alternatives:  &domain.Spec.Alternatives,
+			}
+
+			if len(domain.Spec.Alternatives) > 0 {
+				dom.Alternatives = &domain.Spec.Alternatives
 			}
 
 			// no change
@@ -185,19 +192,21 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			}
 
 			// only apply missing "alternatives" or the request will fail
-			m := make(map[string]bool)
-			alts := []string{}
+			if foundDom.Alternatives != nil && dom.Alternatives != nil {
+				m := make(map[string]bool)
+				alts := []string{}
 
-			for _, val := range *foundDom.Alternatives {
-				m[val] = true
-			}
-
-			for _, alt := range *dom.Alternatives {
-				if _, ok := m[alt]; !ok {
-					alts = append(alts, alt)
+				for _, val := range *foundDom.Alternatives {
+					m[val] = true
 				}
+
+				for _, alt := range *dom.Alternatives {
+					if _, ok := m[alt]; !ok {
+						alts = append(alts, alt)
+					}
+				}
+				dom.Alternatives = &alts
 			}
-			dom.Alternatives = &alts
 
 			response, err = api.UpdateDomain(ctx, domain.Spec.Name, dom)
 			if err != nil {
@@ -221,6 +230,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
 				}
+				logr.Info(fmt.Sprintf("domain %s updated", domain.Spec.Name))
 				return ctrl.Result{}, nil
 			default:
 				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update domain: %d %s", response.StatusCode, body)
@@ -249,6 +259,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err := r.Update(ctx, domain); err != nil {
 			return ctrl.Result{}, err
 		}
+		logr.Info(fmt.Sprintf("domain %s deleted", domain.Spec.Name))
 	}
 
 	return ctrl.Result{}, nil
