@@ -99,7 +99,10 @@ type User struct {
 	DisplayedName *string `json:"displayed_name,omitempty"`
 
 	// Email The email address of the user
-	Email *string `json:"email,omitempty"`
+	Email string `json:"email"`
+
+	// Enabled Enable the user
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// EnableImap Allow email retrieval via IMAP
 	EnableImap *bool `json:"enable_imap,omitempty"`
@@ -107,8 +110,6 @@ type User struct {
 	// EnablePop Allow email retrieval via POP3
 	EnablePop *bool `json:"enable_pop,omitempty"`
 
-	// Enabled Enable the user
-	Enabled            *bool     `json:"enabled,omitempty"`
 	ForwardDestination *[]string `json:"forward_destination,omitempty"`
 
 	// ForwardEnabled Enable auto forwarding
@@ -124,10 +125,13 @@ type User struct {
 	Password *string `json:"password,omitempty"`
 
 	// QuotaBytes The maximum quota for the user’s email box in bytes
-	QuotaBytes *int `json:"quota_bytes,omitempty"`
+	QuotaBytes *int64 `json:"quota_bytes,omitempty"`
 
 	// QuotaBytesUsed The size of the user’s email box in bytes
-	QuotaBytesUsed *int `json:"quota_bytes_used,omitempty"`
+	QuotaBytesUsed *int64 `json:"quota_bytes_used,omitempty"`
+
+	// RawPassword is the plain text password for user creation
+	RawPassword *string `json:"raw_password,omitempty"`
 
 	// ReplyBody The body of the automatic reply email
 	ReplyBody *string `json:"reply_body,omitempty"`
@@ -135,11 +139,11 @@ type User struct {
 	// ReplyEnabled Enable automatic replies. This is also known as out of office (ooo) or out of facility (oof) replies
 	ReplyEnabled *bool `json:"reply_enabled,omitempty"`
 
-	// ReplyEnddate End date for automatic replies in YYYY-MM-DD format.
-	ReplyEnddate *openapi_types.Date `json:"reply_enddate,omitempty"`
+	// ReplyEndDate End date for automatic replies in YYYY-MM-DD format.
+	ReplyEndDate *openapi_types.Date `json:"reply_enddate,omitempty"`
 
-	// ReplyStartdate Start date for automatic replies in YYYY-MM-DD format.
-	ReplyStartdate *openapi_types.Date `json:"reply_startdate,omitempty"`
+	// ReplyStartDate Start date for automatic replies in YYYY-MM-DD format.
+	ReplyStartDate *openapi_types.Date `json:"reply_startdate,omitempty"`
 
 	// ReplySubject Optional subject for the automatic reply
 	ReplySubject *string `json:"reply_subject,omitempty"`
@@ -429,6 +433,209 @@ func NewDeleteDomainRequest(server string, domain string) (*http.Request, error)
 	return req, nil
 }
 
+func (c *Client) FindUser(ctx context.Context, email string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFindUserRequest(c.Server, email)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateUser(ctx context.Context, body User, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateUserRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateUser(ctx context.Context, email string, body User, reqEditors ...RequestEditorFn) (*http.Response, error) { //nolint:lll
+	req, err := NewUpdateUserRequest(c.Server, email, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteUser(ctx context.Context, email string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteUserRequest(c.Server, email)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NewFindUserRequest generates requests for FindUser
+func NewFindUserRequest(server string, email string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "email", runtime.ParamLocationPath, email)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/user/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateUserRequest calls the generic CreateUser builder with application/json body
+func NewCreateUserRequest(server string, body User) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateUserRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateUserRequestWithBody generates requests for CreateUser with any type of body
+func NewCreateUserRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/user"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateUserRequest calls the generic UpdateUser builder with application/json body
+func NewUpdateUserRequest(server string, email string, body User) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateUserRequestWithBody(server, email, "application/json", bodyReader)
+}
+
+// NewUpdateUserRequestWithBody generates requests for UpdateUser with any type of body
+func NewUpdateUserRequestWithBody(server string, email string, contentType string, body io.Reader) (*http.Request, error) { //nolint:lll
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "email", runtime.ParamLocationPath, email)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/user/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteUserRequest generates requests for DeleteUser
+func NewDeleteUserRequest(server string, email string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "email", runtime.ParamLocationPath, email)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/user/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -441,11 +648,4 @@ func (c *Client) applyEditors(ctx context.Context, req *http.Request, additional
 		}
 	}
 	return nil
-}
-
-// JSONError wraps an error json response.
-func JSONError(rw http.ResponseWriter, c int, m string) {
-	rw.Header().Set("Content-Type", "application/json")
-	rw.WriteHeader(c)
-	_, _ = rw.Write([]byte(fmt.Sprintf(`{"errors": [{"title": "error", "detail": "%s"}]}`, m)))
 }

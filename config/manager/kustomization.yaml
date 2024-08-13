@@ -4,5 +4,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: registry.prod.k8s.rootcrew.net/mailu-operator
+  newName: example.com/mailu-operator
   newTag: v0.0.1

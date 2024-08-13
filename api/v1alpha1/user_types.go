@@ -22,31 +22,35 @@ import (
 
 // UserSpec defines the desired state of User
 type UserSpec struct {
-	AllowSpoofing      bool   `json:"allowSpoofing,omitempty"`
-	ChangePassword     bool   `json:"changePassword,omitempty"`
-	Comment            string `json:"comment,omitempty"`
-	DisplayedName      string `json:"displayedName,omitempty"`
-	Domain             string `json:"domain"`
-	Enabled            bool   `json:"enabled,omitempty"`
-	EnableIMAP         bool   `json:"enableIMAP,omitempty"`
-	EnablePOP          bool   `json:"enablePOP,omitempty"`
-	ForwardEnabled     bool   `json:"forwardEnabled,omitempty"`
-	ForwardDestination string `json:"forwardDestination,omitempty"`
-	ForwardKeep        bool   `json:"forwardKeep,omitempty"`
-	GlobalAdmin        bool   `json:"globalAdmin,omitempty"`
-	Name               string `json:"name"`
-	// TODO: rename?
-	PasswordSecret string `json:"passwordSecret,omitempty"`
-	PasswordKey    string `json:"passwordKey,omitempty"`
-	QuotaBytes     int64  `json:"quotaBytes,omitempty"`
-	ReplyEnabled   bool   `json:"replyEnabled,omitempty"`
-	ReplySubject   string `json:"replySubject,omitempty"`
-	ReplyBody      string `json:"replyBody,omitempty"`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	AllowSpoofing  bool   `json:"allowSpoofing,omitempty"`
+	ChangePassword bool   `json:"changePassword,omitempty"`
+	Comment        string `json:"comment,omitempty"`
+	DisplayedName  string `json:"displayedName,omitempty"`
+	Domain         string `json:"domain"`
+	Enabled        bool   `json:"enabled,omitempty"`
+	EnableIMAP     bool   `json:"enableIMAP,omitempty"`
+	EnablePOP      bool   `json:"enablePOP,omitempty"`
+	ForwardEnabled bool   `json:"forwardEnabled,omitempty"`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	ForwardDestination []string `json:"forwardDestination,omitempty"`
+	ForwardKeep        bool     `json:"forwardKeep,omitempty"`
+	GlobalAdmin        bool     `json:"globalAdmin,omitempty"`
+	Name               string   `json:"name"`
+	PasswordSecret     string   `json:"passwordSecret,omitempty"`
+	PasswordKey        string   `json:"passwordKey,omitempty"`
+	QuotaBytes         int64    `json:"quotaBytes,omitempty"`
+	RawPassword        string   `json:"rawPassword,omitempty"`
+	ReplyEnabled       bool     `json:"replyEnabled,omitempty"`
+	ReplySubject       string   `json:"replySubject,omitempty"`
+	ReplyBody          string   `json:"replyBody,omitempty"`
+	// +kubebuilder:validation:Format=date
 	ReplyStartDate string `json:"replyStartDate,omitempty"`
+	// +kubebuilder:validation:Format=date
 	ReplyEndDate   string `json:"replyEndDate,omitempty"`
 	SpamEnabled    bool   `json:"spamEnabled,omitempty"`
 	SpamMarkAsRead bool   `json:"spamMarkAsRead,omitempty"`
-	SpamThreshold  int64  `json:"spamThreshold,omitempty"`
+	SpamThreshold  int    `json:"spamThreshold,omitempty"`
 }
 
 // UserStatus defines the observed state of User

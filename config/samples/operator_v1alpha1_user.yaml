@@ -12,7 +12,7 @@ spec:
   comment: "test user"
   displayedName: "test@example.com"
   domain: example.com
-  # enabled: true
+  enabled: true
   enableIMAP: false
   enablePOP: false
   # forwardEnabled: false
@@ -22,8 +22,8 @@ spec:
   name: test
   quotaBytes: -1
   # rawPassword: "s3cr3t!"
-  passwordSecret: "user-secret"
-  passwordKey: "test_example.com"
+  # passwordSecret: "mailu-users"
+  # passwordKey: "test@example.com"
   # replyEnabled: false
   # replySubject: "subject"
   # replyBody: "body"

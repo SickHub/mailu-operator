@@ -4,8 +4,50 @@ The purpose of this project is to define Email Domains, Users and Aliases used i
 The Mailu-Operator uses the Mailu API to create/update/delete Domains, Users and Aliases, it therefore needs the API 
 endpoint and token which can be set through command line or the environment variables `MAILU_SERVER` and `MAILU_TOKEN`.
 
+**Important note**: A user can still make changes in the Mailu frontend which are not synced back to the CRDs.
+Also, some changes may be intended to be done "on-the-fly" in the Mailu frontend, for example setting auto reply or changing the password.
+
 ## Description
 // TODO(user): An in-depth paragraph about your project and overview of use
+
+Domain fields and defaults (see [sample](config/samples/operator_v1alpha1_domain.yaml))
+- Name (required)
+- Comment
+- MaxUsers
+- MaxAliases
+- MaxQuotaBytes
+- SignupEnabled
+- Alternatives
+
+User fields and defaults
+- AllowSpoofing
+- ChangePwNextLogin
+- Comment
+- DisplayedName
+- Domain (required)
+- Enabled
+- EnableImap
+- EnablePop
+- ForwardDestination
+- ForwardEnabled
+- ForwardKeep
+- GlobalAdmin
+- Name (required)
+- Password (hash, excluded from updates)
+- PasswordSecret (secret name in current namespace)
+- PasswordKey (key within the secret which contains the password)
+- QuotaBytes
+- QuotaBytesUsed (excluded from updates)
+- RawPassword (excluded from updates, TODO: watch for changes to secret and apply)
+- ReplyBody (TODO: excluded from updates)
+- ReplyEnabled (TODO: excluded from updates)
+- ReplyEnddate (TODO: excluded from updates)
+- ReplyStartdate (TODO: excluded from updates)
+- ReplySubject (TODO: excluded from updates)
+- SpamEnabled
+- SpamMarkAsRead
+- SpamThreshold
+
 
 ```mermaid
 flowchart LR
