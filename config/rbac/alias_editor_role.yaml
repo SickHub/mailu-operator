@@ -1,0 +1,27 @@
+# permissions for end users to edit aliases.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: mailu-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: alias-editor-role
+rules:
+- apiGroups:
+  - operator.mailu.io
+  resources:
+  - aliases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - operator.mailu.io
+  resources:
+  - aliases/status
+  verbs:
+  - get

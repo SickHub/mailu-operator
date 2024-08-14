@@ -156,9 +156,21 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 			switch response.StatusCode {
 			case http.StatusBadRequest:
-				return ctrl.Result{}, errors.New("bad request")
+				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "User creation failed: " + string(body)})
+				err = r.Status().Update(ctx, user)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
+				logr.Error(err, fmt.Sprintf("failed to update user: %d %s", response.StatusCode, body))
+				return ctrl.Result{Requeue: false}, nil
 			case http.StatusConflict:
-				return ctrl.Result{}, fmt.Errorf("conflict error: %d %s", response.StatusCode, body)
+				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "User creation failed: " + string(body)})
+				err = r.Status().Update(ctx, user)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
+				logr.Error(err, fmt.Sprintf("failed to update user: %d %s", response.StatusCode, body))
+				return ctrl.Result{Requeue: false}, nil
 			case http.StatusOK:
 				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Created", Message: "User created"})
 				err = r.Status().Update(ctx, user)
@@ -168,6 +180,11 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				logr.Info(fmt.Sprintf("user %s created", email))
 				return ctrl.Result{}, nil
 			default:
+				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "User creation failed: " + string(body)})
+				err = r.Status().Update(ctx, user)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
 				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to create user: %d %s", response.StatusCode, body)
 			}
 
@@ -218,7 +235,13 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 			switch response.StatusCode {
 			case http.StatusBadRequest:
-				return ctrl.Result{}, errors.New("bad request")
+				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Updated", Message: "User update failed: " + string(body)})
+				err = r.Status().Update(ctx, user)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
+				logr.Error(err, fmt.Sprintf("failed to update user: %d %s", response.StatusCode, body))
+				return ctrl.Result{Requeue: false}, nil
 			case http.StatusOK:
 				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "User updated"})
 				err = r.Status().Update(ctx, user)
@@ -228,6 +251,11 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				logr.Info(fmt.Sprintf("user %s updated", email))
 				return ctrl.Result{}, nil
 			default:
+				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Updated", Message: "User update failed: " + string(body)})
+				err = r.Status().Update(ctx, user)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
 				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update user: %d %s", response.StatusCode, body)
 			}
 
