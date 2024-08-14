@@ -1,4 +1,4 @@
-module gitlab.rootcrew.net/rootcrew/services/mailu-operator
+module github.com/sickhub/mailu-operator
 
 go 1.22.0
 

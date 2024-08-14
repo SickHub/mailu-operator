@@ -27,7 +27,7 @@ import (
 	"reflect"
 	"time"
 
-	"gitlab.rootcrew.net/rootcrew/services/mailu-operator/pkg/mailu"
+	"github.com/sickhub/mailu-operator/pkg/mailu"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	operatorv1alpha1 "gitlab.rootcrew.net/rootcrew/services/mailu-operator/api/v1alpha1"
+	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
 )
 
 const (

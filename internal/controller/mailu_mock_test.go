@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
-	"gitlab.rootcrew.net/rootcrew/services/mailu-operator/pkg/mailu"
+	"github.com/sickhub/mailu-operator/pkg/mailu"
 )
 
 func mailuMock() string {

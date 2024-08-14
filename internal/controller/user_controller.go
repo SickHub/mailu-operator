@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
-	"gitlab.rootcrew.net/rootcrew/services/mailu-operator/pkg/mailu"
+	"github.com/sickhub/mailu-operator/pkg/mailu"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	operatorv1alpha1 "gitlab.rootcrew.net/rootcrew/services/mailu-operator/api/v1alpha1"
+	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
 )
 
 // UserReconciler reconciles a User object

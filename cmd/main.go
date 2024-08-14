@@ -37,8 +37,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	operatorv1alpha1 "gitlab.rootcrew.net/rootcrew/services/mailu-operator/api/v1alpha1"
-	"gitlab.rootcrew.net/rootcrew/services/mailu-operator/internal/controller"
+	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
+	"github.com/sickhub/mailu-operator/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 

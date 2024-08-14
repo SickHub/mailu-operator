@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	operatorv1alpha1 "gitlab.rootcrew.net/rootcrew/services/mailu-operator/api/v1alpha1"
+	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
 )
 
 var _ = Describe("Domain Controller", func() {

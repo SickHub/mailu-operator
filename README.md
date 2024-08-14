@@ -70,7 +70,7 @@ flowchart LR
 ## Getting Started
 
 ```shell
-operator-sdk init --plugins=go/v4 --domain mailu.io --repo gitlab.rootcrew.net/rootcrew/services/mailu-operator
+operator-sdk init --plugins=go/v4 --domain mailu.io --repo github.com/sickhub/mailu-operator
 operator-sdk create api --group operator --version v1alpha1 --kind Domain --resource --controller
 operator-sdk create api --group operator --version v1alpha1 --kind User --resource --controller
 operator-sdk create api --group operator --version v1alpha1 --kind Alias --resource --controller

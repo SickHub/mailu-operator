@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"gitlab.rootcrew.net/rootcrew/services/mailu-operator/test/utils"
+	"github.com/sickhub/mailu-operator/test/utils"
 )
 
 const namespace = "mailu-operator"
