@@ -16,39 +16,39 @@ For details refer also to your Mailu API documentation: https://mailu.io/master/
 Domain fields and defaults (see [sample](config/samples/operator_v1alpha1_domain.yaml))
 - Name (required)
 - Comment
-- MaxUsers
-- MaxAliases
-- MaxQuotaBytes
-- SignupEnabled
+- MaxUsers = 0
+- MaxAliases = 0
+- MaxQuotaBytes = 0
+- SignupEnabled = false
 - Alternatives
 
 User fields and defaults (see [sample](config/samples/operator_v1alpha1_user.yaml))
 - Name (required)
 - Domain (required)
-- AllowSpoofing
-- ChangePwNextLogin
+- AllowSpoofing = false
+- ChangePwNextLogin = true
 - Comment
 - DisplayedName
-- Enabled
-- EnableImap
-- EnablePop
+- Enabled = false
+- EnableImap = true
+- EnablePop = true
 - ForwardDestination
-- ForwardEnabled
-- ForwardKeep
-- GlobalAdmin
+- ForwardEnabled = false
+- ForwardKeep = false
+- GlobalAdmin = false
 - Password (hash, excluded from updates)
 - PasswordSecret (takes precedence over `RawPassword`, secret name in the current namespace)
 - PasswordKey (key within the `PasswordSecret` which contains the password)
-- QuotaBytes
+- QuotaBytes = 0
 - QuotaBytesUsed (excluded from updates)
 - RawPassword (excluded from updates; **optional**: if not set, a random password will be generated)
 - ReplyBody (TODO: excluded from updates)
-- ReplyEnabled (TODO: excluded from updates)
+- ReplyEnabled = false (TODO: excluded from updates)
 - ReplyEnddate (TODO: excluded from updates)
 - ReplyStartdate (TODO: excluded from updates)
 - ReplySubject (TODO: excluded from updates)
-- SpamEnabled
-- SpamMarkAsRead
+- SpamEnabled = false
+- SpamMarkAsRead = false
 - SpamThreshold
 
 Alias fields and defaults (see [sample](config/samples/operator_v1alpha1_alias.yaml))
@@ -56,7 +56,7 @@ Alias fields and defaults (see [sample](config/samples/operator_v1alpha1_alias.y
 - Domain (required)
 - Comment
 - Destination
-- Wildcard
+- Wildcard = false
 
 ### Simplified flow
 
@@ -73,6 +73,27 @@ flowchart LR
   Controller -- 3. get/create/update/delete Domain --> MailuAPI
   Controller -- 4. update resource status --> CRD
 ```
+
+### How to use the resources
+
+#### Domain
+
+Domains defines the domain names known to the mail system.
+
+At the current state, this project does not touch DNS records in any form, nor does it trigger generation of DKIM keys.
+It might be interesting to automate DNS records in the future with `external-dns`: https://github.com/Mailu/Mailu/issues/547#issuecomment-1722539650
+
+#### User
+
+Basically any email address that should be able to receive or send emails on its address must be a user. The domain used must be configured.
+Even if you only forward emails to an external address hosted elsewhere, you need to create a user (with `forwardDestination` set).
+
+#### Alias
+
+Aliases only work with domains and email addresses know to the system, i.e. you cannot define an alias to forward emails to an external address. 
+For that, you need to create a user.
+
+Aliases are used to route emails for multiple email addresses to a user (email) known to the system.
 
 ## Getting Started
 
