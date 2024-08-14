@@ -1,4 +1,5 @@
 # mailu-operator
+
 The purpose of this project is to define Email Domains, Users and Aliases used in Mailu via CRs.
 
 The Mailu-Operator uses the Mailu API to create/update/delete Domains, Users and Aliases, it therefore needs the API 
@@ -8,6 +9,7 @@ endpoint and token which can be set through command line or the environment vari
 Also, some changes may be intended to be done "on-the-fly" in the Mailu frontend, for example setting auto reply or changing the password.
 
 ## Description
+
 This operator adds three custom resources: `Domain`, `User` and `Alias` and each resource represents an object in Mailu API.
 For details refer also to your Mailu API documentation: https://mailu.io/master/api.html
 
@@ -21,11 +23,12 @@ Domain fields and defaults (see [sample](config/samples/operator_v1alpha1_domain
 - Alternatives
 
 User fields and defaults (see [sample](config/samples/operator_v1alpha1_user.yaml))
+- Name (required)
+- Domain (required)
 - AllowSpoofing
 - ChangePwNextLogin
 - Comment
 - DisplayedName
-- Domain (required)
 - Enabled
 - EnableImap
 - EnablePop
@@ -33,13 +36,12 @@ User fields and defaults (see [sample](config/samples/operator_v1alpha1_user.yam
 - ForwardEnabled
 - ForwardKeep
 - GlobalAdmin
-- Name (required)
 - Password (hash, excluded from updates)
-- PasswordSecret (secret name in current namespace)
-- PasswordKey (key within the secret which contains the password)
+- PasswordSecret (takes precedence over `RawPassword`, secret name in the current namespace)
+- PasswordKey (key within the `PasswordSecret` which contains the password)
 - QuotaBytes
 - QuotaBytesUsed (excluded from updates)
-- RawPassword (excluded from updates, TODO: watch for changes to secret and apply)
+- RawPassword (excluded from updates; **optional**: if not set, a random password will be generated)
 - ReplyBody (TODO: excluded from updates)
 - ReplyEnabled (TODO: excluded from updates)
 - ReplyEnddate (TODO: excluded from updates)
@@ -57,6 +59,7 @@ Alias fields and defaults (see [sample](config/samples/operator_v1alpha1_alias.y
 - Wildcard
 
 ### Simplified flow
+
 Using `Domain` as an example resource
 ```mermaid
 flowchart LR
@@ -64,18 +67,17 @@ flowchart LR
   Controller
   MailuAPI(Mailu API)
   
-  User -- 1. create Domain resource --> CRD
+  User -- 1. create/update/delete Domain resource --> CRD
   
   Controller -- 2. watch Domain resources --> CRD
-  Controller -- 3. get/create/update Domain --> MailuAPI
+  Controller -- 3. get/create/update/delete Domain --> MailuAPI
   Controller -- 4. update resource status --> CRD
 ```
 
 ## Getting Started
 
-
-
 ### Prerequisites
+
 - go version v1.21.0+
 - docker version 17.03+.
 - kubectl version v1.11.3+.
@@ -84,6 +86,7 @@ flowchart LR
 
 
 ## Try it out
+
 As this project is brand new and in alpha stage, here are the current steps to try it out:
 
 ```shell
@@ -102,7 +105,6 @@ Uninstall
 ```shell
 kubectl delete -f dist/install.yaml
 ```
-
 
 ## Development: Build and deploy on your cluster
 

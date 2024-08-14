@@ -27,6 +27,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/sethvargo/go-password/password"
+
 	"k8s.io/apimachinery/pkg/types"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -129,18 +131,22 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				return ctrl.Result{}, err
 			}
 
-			// set the password
-			rawPassword := user.Spec.RawPassword
-			if rawPassword == "" && user.Spec.PasswordSecret != "" && user.Spec.PasswordKey != "" {
-				rawPassword, err = r.getUserPassword(ctx, req.Namespace, user.Spec.PasswordSecret, user.Spec.PasswordKey)
-				if err != nil {
-					logr.Error(err, fmt.Sprintf("failed to get password from secret %s/%s", req.Namespace, user.Spec.PasswordSecret))
-					return ctrl.Result{Requeue: true}, err
+			// RawPassword is required during creation
+			if user.Spec.RawPassword == "" {
+				if user.Spec.PasswordSecret != "" && user.Spec.PasswordKey != "" {
+					user.Spec.RawPassword, err = r.getUserPassword(ctx, req.Namespace, user.Spec.PasswordSecret, user.Spec.PasswordKey)
+					if err != nil {
+						logr.Error(err, fmt.Sprintf("failed to get password from secret %s/%s", req.Namespace, user.Spec.PasswordSecret))
+						return ctrl.Result{Requeue: true}, err
+					}
+				} else {
+					// initial random password if none given
+					user.Spec.RawPassword, err = password.Generate(20, 2, 2, false, false)
+					if err != nil {
+						logr.Error(err, fmt.Sprintf("failed to generate password for user %s", email))
+						return ctrl.Result{Requeue: true}, err
+					}
 				}
-			}
-
-			if rawPassword != "" {
-				newUser.RawPassword = &rawPassword
 			}
 
 			response, err = api.CreateUser(ctx, newUser)
@@ -161,7 +167,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
 				}
-				logr.Error(err, fmt.Sprintf("failed to update user: %d %s", response.StatusCode, body))
+				logr.Error(err, fmt.Sprintf("failed to create user: %d %s", response.StatusCode, body))
 				return ctrl.Result{Requeue: false}, nil
 			case http.StatusConflict:
 				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "User creation failed: " + string(body)})
@@ -169,7 +175,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
 				}
-				logr.Error(err, fmt.Sprintf("failed to update user: %d %s", response.StatusCode, body))
+				logr.Error(err, fmt.Sprintf("failed to create user: %d %s", response.StatusCode, body))
 				return ctrl.Result{Requeue: false}, nil
 			case http.StatusOK:
 				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Created", Message: "User created"})
@@ -319,6 +325,7 @@ func (r *UserReconciler) userFromSpec(spec operatorv1alpha1.UserSpec) (mailu.Use
 		ForwardKeep:        &spec.ForwardKeep,
 		GlobalAdmin:        &spec.GlobalAdmin,
 		QuotaBytes:         &spec.QuotaBytes,
+		RawPassword:        &spec.RawPassword,
 		ReplyBody:          &spec.ReplyBody,
 		ReplyEnabled:       &spec.ReplyEnabled,
 		ReplySubject:       &spec.ReplySubject,
