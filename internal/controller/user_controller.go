@@ -133,7 +133,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 						logr.Error(err, fmt.Sprintf("failed to get password from secret %s/%s", req.Namespace, user.Spec.PasswordSecret))
 						return ctrl.Result{Requeue: true}, err
 					}
-					logr.Info(fmt.Sprintf("using password from secret for user %s: %s", email, user.Spec.RawPassword))
+					logr.Info(fmt.Sprintf("using password from secret for user %s", email))
 				} else {
 					// initial random password if none given
 					user.Spec.RawPassword, err = password.Generate(20, 2, 2, false, false)
@@ -141,7 +141,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 						logr.Error(err, fmt.Sprintf("failed to generate password for user %s", email))
 						return ctrl.Result{Requeue: true}, err
 					}
-					logr.Info(fmt.Sprintf("using generated password for user %s: %s", email, user.Spec.RawPassword))
+					logr.Info(fmt.Sprintf("using generated password for user %s", email))
 				}
 			}
 
@@ -214,6 +214,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 
 			// reset some values that don't exist in new user or should not be updated
+			newUser.RawPassword = nil
 			foundUser.Password = nil
 			foundUser.QuotaBytesUsed = nil
 
