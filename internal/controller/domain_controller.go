@@ -25,6 +25,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"time"
 
 	"gitlab.rootcrew.net/rootcrew/services/mailu-operator/pkg/mailu"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -102,7 +103,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, errors.New("bad request")
 
 	case http.StatusServiceUnavailable:
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Minute}, nil
 	}
 
 	if domain.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -119,15 +120,21 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		var response *http.Response
 		switch find.StatusCode {
 		case http.StatusNotFound:
-			response, err = api.CreateDomain(ctx, mailu.Domain{
+			dom := mailu.Domain{
 				Name:          domain.Spec.Name,
 				Comment:       &domain.Spec.Comment,
 				MaxUsers:      &domain.Spec.MaxUsers,
 				MaxAliases:    &domain.Spec.MaxAliases,
 				MaxQuotaBytes: &domain.Spec.MaxQuotaBytes,
 				SignupEnabled: &domain.Spec.SignupEnabled,
-				Alternatives:  &domain.Spec.Alternatives,
-			})
+			}
+
+			if len(domain.Spec.Alternatives) > 0 {
+				dom.Alternatives = &domain.Spec.Alternatives
+			}
+
+			response, err = api.CreateDomain(ctx, dom)
+
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -140,15 +147,22 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 			switch response.StatusCode {
 			case http.StatusBadRequest:
-				// TODO: define consistent conditions/types that make sense (Created, Updated, Deleted?)
-				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Unavailable", Status: metav1.ConditionFalse, Reason: "Bad request", Message: "Domain creation failed"})
+				// TODO: define consistent conditions/types that make sense (Created, Updated, Deleted?) https://maelvls.dev/kubernetes-conditions/
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Domain creation failed: " + string(body)})
 				err = r.Status().Update(ctx, domain)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
 				}
-				return ctrl.Result{Requeue: false}, errors.New("bad request")
+				logr.Error(err, fmt.Sprintf("bad request: %d %s", response.StatusCode, body))
+				return ctrl.Result{Requeue: false}, nil
 			case http.StatusConflict:
-				return ctrl.Result{}, fmt.Errorf("conflicting domain / alternative during create: %d %s", response.StatusCode, body)
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Domain creation failed: " + string(body)})
+				err = r.Status().Update(ctx, domain)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
+				logr.Error(err, fmt.Sprintf("conflicting domain / alternative during create: %d %s", response.StatusCode, body))
+				return ctrl.Result{Requeue: false}, nil
 			case http.StatusOK:
 				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Created", Message: "Domain created"})
 				err = r.Status().Update(ctx, domain)
@@ -156,8 +170,15 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 					return ctrl.Result{Requeue: true}, err
 				}
 				logr.Info(fmt.Sprintf("domain %s created", domain.Spec.Name))
+				// TODO: ensure keys are generated, as we created the domain, they do not exist
+				// api.GenerateDomainKeys(domain.Spec.Name)
 				return ctrl.Result{}, nil
 			default:
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Domain creation failed: " + string(body)})
+				err = r.Status().Update(ctx, domain)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
 				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to create domain: %d %s", response.StatusCode, body)
 			}
 
@@ -180,6 +201,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				MaxAliases:    &domain.Spec.MaxAliases,
 				MaxQuotaBytes: &domain.Spec.MaxQuotaBytes,
 				SignupEnabled: &domain.Spec.SignupEnabled,
+				Alternatives:  &[]string{},
 			}
 
 			if len(domain.Spec.Alternatives) > 0 {
@@ -188,25 +210,65 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 			// no change
 			if reflect.DeepEqual(foundDom, dom) {
-				return ctrl.Result{}, nil
+				return ctrl.Result{Requeue: false}, nil
 			}
 
-			// only apply missing "alternatives" or the request will fail
+			// only apply missing "alternatives" or the request will fail, remove excessive alternatives
 			if foundDom.Alternatives != nil && dom.Alternatives != nil {
 				m := make(map[string]bool)
+				n := make(map[string]bool)
 				alts := []string{}
+				removeAlts := []string{}
 
 				for _, val := range *foundDom.Alternatives {
 					m[val] = true
 				}
 
 				for _, alt := range *dom.Alternatives {
+					n[alt] = true
 					if _, ok := m[alt]; !ok {
 						alts = append(alts, alt)
 					}
 				}
 				dom.Alternatives = &alts
+
+				// determine alternatives that should be removed
+				for _, val := range *foundDom.Alternatives {
+					if _, ok := n[val]; !ok {
+						removeAlts = append(removeAlts, val)
+					}
+				}
+
+				for _, rem := range removeAlts {
+					del, err := api.DeleteAlternative(ctx, rem)
+					if err != nil {
+						return ctrl.Result{}, err
+					}
+					if del.StatusCode != http.StatusOK {
+						// TODO:
+						return ctrl.Result{}, nil
+					}
+				}
+
+				if len(removeAlts) > 0 {
+					meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Domain alternatives updated"})
+					err = r.Status().Update(ctx, domain)
+					if err != nil {
+						return ctrl.Result{Requeue: true}, err
+					}
+					logr.Info(fmt.Sprintf("domain %s alternatives updated", domain.Spec.Name))
+				}
+				foundDom.Alternatives = &alts
 			}
+
+			// no change after alternatives sync
+			if reflect.DeepEqual(foundDom, dom) {
+				return ctrl.Result{Requeue: false}, nil
+			}
+
+			fDomJ, _ := json.Marshal(foundDom)
+			domJ, _ := json.Marshal(dom)
+			logr.Info(fmt.Sprintf("domains update:\n%s\n%s", fDomJ, domJ))
 
 			response, err = api.UpdateDomain(ctx, domain.Spec.Name, dom)
 			if err != nil {
@@ -221,9 +283,21 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 			switch response.StatusCode {
 			case http.StatusBadRequest:
-				return ctrl.Result{}, errors.New("bad request")
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Updated", Message: "Domain update failed: " + string(body)})
+				err = r.Status().Update(ctx, domain)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
+				logr.Error(err, fmt.Sprintf("failed to update domain: %d %s", response.StatusCode, body))
+				return ctrl.Result{Requeue: false}, nil
 			case http.StatusConflict:
-				return ctrl.Result{}, fmt.Errorf("conflicting domain / alternative during update: %d %s", response.StatusCode, body)
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Updated", Message: "Domain update failed: " + string(body)})
+				err = r.Status().Update(ctx, domain)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
+				logr.Error(err, fmt.Sprintf("failed to update domain: %d %s", response.StatusCode, body))
+				return ctrl.Result{Requeue: false}, nil
 			case http.StatusOK:
 				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Domain updated"})
 				err = r.Status().Update(ctx, domain)
@@ -231,8 +305,16 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 					return ctrl.Result{Requeue: true}, err
 				}
 				logr.Info(fmt.Sprintf("domain %s updated", domain.Spec.Name))
+				// TODO: ensure keys are generated, as we created the domain, they do not exist
+				// if foundDom.DnsDKIM == ""
+				// api.GenerateDomainKeys(domain.Spec.Name)
 				return ctrl.Result{}, nil
 			default:
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Updated", Message: "Domain update failed: " + string(body)})
+				err = r.Status().Update(ctx, domain)
+				if err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
 				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update domain: %d %s", response.StatusCode, body)
 			}
 

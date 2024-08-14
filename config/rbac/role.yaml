@@ -14,6 +14,32 @@ rules:
 - apiGroups:
   - operator.mailu.io
   resources:
+  - aliases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - operator.mailu.io
+  resources:
+  - aliases/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - operator.mailu.io
+  resources:
+  - aliases/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - operator.mailu.io
+  resources:
   - domains
   verbs:
   - create

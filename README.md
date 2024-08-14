@@ -48,6 +48,11 @@ User fields and defaults
 - SpamMarkAsRead
 - SpamThreshold
 
+Alias fields and defaults
+- Email (required)
+- Comment
+- Destination
+- Wildcard
 
 ```mermaid
 flowchart LR
@@ -68,7 +73,7 @@ flowchart LR
 operator-sdk init --plugins=go/v4 --domain mailu.io --repo gitlab.rootcrew.net/rootcrew/services/mailu-operator
 operator-sdk create api --group operator --version v1alpha1 --kind Domain --resource --controller
 operator-sdk create api --group operator --version v1alpha1 --kind User --resource --controller
-#operator-sdk create api --group operator --version v1alpha1 --kind Alias --resource --controller
+operator-sdk create api --group operator --version v1alpha1 --kind Alias --resource --controller
 ```
 
 ### Prerequisites

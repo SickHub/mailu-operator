@@ -1,0 +1,13 @@
+apiVersion: operator.mailu.io/v1alpha1
+kind: Alias
+metadata:
+  labels:
+    app.kubernetes.io/name: mailu-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: alias-sample
+spec:
+  email: test@example.com
+  comment: "test email"
+  destination:
+  - test2@example.com
+  wildcard: true

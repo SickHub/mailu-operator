@@ -29,4 +29,13 @@ resources:
   kind: User
   path: gitlab.rootcrew.net/rootcrew/services/mailu-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: mailu.io
+  group: operator
+  kind: Alias
+  path: gitlab.rootcrew.net/rootcrew/services/mailu-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"
