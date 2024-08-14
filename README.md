@@ -8,7 +8,8 @@ endpoint and token which can be set through command line or the environment vari
 Also, some changes may be intended to be done "on-the-fly" in the Mailu frontend, for example setting auto reply or changing the password.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+This operator adds three custom resources: `Domain`, `User` and `Alias` and each resource represents an object in Mailu API.
+For details refer also to your Mailu API documentation: https://mailu.io/master/api.html
 
 Domain fields and defaults (see [sample](config/samples/operator_v1alpha1_domain.yaml))
 - Name (required)
@@ -19,7 +20,7 @@ Domain fields and defaults (see [sample](config/samples/operator_v1alpha1_domain
 - SignupEnabled
 - Alternatives
 
-User fields and defaults
+User fields and defaults (see [sample](config/samples/operator_v1alpha1_user.yaml))
 - AllowSpoofing
 - ChangePwNextLogin
 - Comment
@@ -48,27 +49,64 @@ User fields and defaults
 - SpamMarkAsRead
 - SpamThreshold
 
-Alias fields and defaults
-- Email (required)
+Alias fields and defaults (see [sample](config/samples/operator_v1alpha1_alias.yaml))
+- Name (required)
+- Domain (required)
 - Comment
 - Destination
 - Wildcard
 
+### Simplified flow
+Using `Domain` as an example resource
 ```mermaid
 flowchart LR
-  CRD(Domain)
+  CRD(Domain resource)
   Controller
-  MailUAPI(MailU API)
+  MailuAPI(Mailu API)
   
-  User -- create Domain resource --> CRD
+  User -- 1. create Domain resource --> CRD
   
-  Controller -- watch Domain resources --> CRD
-  Controller -- get/create/update Domain --> MailUAPI
-  Controller -- update resource --> CRD
+  Controller -- 2. watch Domain resources --> CRD
+  Controller -- 3. get/create/update Domain --> MailuAPI
+  Controller -- 4. update resource status --> CRD
 ```
 
 ## Getting Started
 
+
+
+### Prerequisites
+- go version v1.21.0+
+- docker version 17.03+.
+- kubectl version v1.11.3+.
+- Access to a Kubernetes v1.11.3+ cluster.
+- A running installation of [Mailu](https://github.com/Mailu/Mailu) with API enabled.
+
+
+## Try it out
+As this project is brand new and in alpha stage, here are the current steps to try it out:
+
+```shell
+REGISTRY=<your-registry>
+# 1. build the image and push it to your own registry
+make docker-buildx IMG=$REGISTRY/mailu-operator:v0.0.1
+
+# 2. build the `install.yaml` used to deploy the operator (including CRDs, Roles and Deployment)
+make build-installer IMG=$REGISTRY/mailu-operator:v0.0.1
+
+# 3. apply the `install.yaml` to your k8s cluster
+kubectl apply -f dist/install.yaml
+```
+
+Uninstall
+```shell
+kubectl delete -f dist/install.yaml
+```
+
+
+## Development: Build and deploy on your cluster
+
+To setup the project, `operator-sdk` was used to generate the structure and custom resource objects:
 ```shell
 operator-sdk init --plugins=go/v4 --domain mailu.io --repo github.com/sickhub/mailu-operator
 operator-sdk create api --group operator --version v1alpha1 --kind Domain --resource --controller
@@ -76,13 +114,6 @@ operator-sdk create api --group operator --version v1alpha1 --kind User --resour
 operator-sdk create api --group operator --version v1alpha1 --kind Alias --resource --controller
 ```
 
-### Prerequisites
-- go version v1.21.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
-
-### To Deploy on the cluster
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
