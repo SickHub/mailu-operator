@@ -6,8 +6,9 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: alias-sample
 spec:
-  email: test@example.com
   comment: "test email"
   destination:
   - test2@example.com
+  domain: example.com
+  name: test
   wildcard: true
