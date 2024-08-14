@@ -125,12 +125,6 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		var response *http.Response
 		switch find.StatusCode {
 		case http.StatusNotFound:
-			newUser, err := r.userFromSpec(user.Spec)
-			if err != nil {
-				logr.Error(err, fmt.Sprintf("failed create user from spec, invalid date: %s or %s", user.Spec.ReplyStartDate, user.Spec.ReplyEndDate))
-				return ctrl.Result{}, err
-			}
-
 			// RawPassword is required during creation
 			if user.Spec.RawPassword == "" {
 				if user.Spec.PasswordSecret != "" && user.Spec.PasswordKey != "" {
@@ -139,6 +133,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 						logr.Error(err, fmt.Sprintf("failed to get password from secret %s/%s", req.Namespace, user.Spec.PasswordSecret))
 						return ctrl.Result{Requeue: true}, err
 					}
+					logr.Info(fmt.Sprintf("using password from secret for user %s: %s", email, user.Spec.RawPassword))
 				} else {
 					// initial random password if none given
 					user.Spec.RawPassword, err = password.Generate(20, 2, 2, false, false)
@@ -146,7 +141,14 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 						logr.Error(err, fmt.Sprintf("failed to generate password for user %s", email))
 						return ctrl.Result{Requeue: true}, err
 					}
+					logr.Info(fmt.Sprintf("using generated password for user %s: %s", email, user.Spec.RawPassword))
 				}
+			}
+
+			newUser, err := r.userFromSpec(user.Spec)
+			if err != nil {
+				logr.Error(err, fmt.Sprintf("failed create user from spec, invalid date: %s or %s", user.Spec.ReplyStartDate, user.Spec.ReplyEndDate))
+				return ctrl.Result{}, err
 			}
 
 			response, err = api.CreateUser(ctx, newUser)
