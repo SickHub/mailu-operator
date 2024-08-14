@@ -22,6 +22,7 @@ import (
 	"flag"
 	"os"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -32,6 +33,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -140,6 +142,10 @@ func main() {
 			// TODO: how to use current namespace?
 			DefaultNamespaces: map[string]cache.Config{"mail": {}},
 		},
+		// disable cache (and watch) for secrets
+		// nolint:lll
+		// see https://github.com/kubernetes-sigs/controller-runtime/blob/b901db121e1f53c47ec9f9683fad90a546688c3e/pkg/client/client.go#L62
+		Client: ctrlclient.Options{Cache: &ctrlclient.CacheOptions{DisableFor: []ctrlclient.Object{&corev1.Secret{}}}},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
