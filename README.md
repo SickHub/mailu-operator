@@ -222,17 +222,22 @@ make undeploy
 Following are the steps to build the installer and distribute this project to users.
 
 1. Build the installer for the release tag:
-
-```sh
-VERSION=0.0.2 make build-installer
-```
+    ```sh
+    VERSION=0.0.2 make build-installer
+    ```
 
 2. Create a Pull-Request with the changes
-  - at least `dist/install.yaml` and `config/manager/kustomization.yaml` containing the latest tag
+    - at least `dist/install.yaml` and `config/manager/kustomization.yaml` containing the latest tag
 
 3. Merge the Pull-Request
-  - the image will be built and pushed to docker hub
-  - a release with be created with generated release notes
+    - the image will be built and pushed to docker hub
+    - a release with be created with generated release notes
+
+4. Push the tag
+    ```shell
+    git tag v0.0.2
+    git push
+    ```
 
 
 ## Contributing
