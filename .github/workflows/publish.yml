@@ -69,7 +69,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push
-        run: make buildx-build IMG=drpsychick/mailu-operator:${{ steps.meta.outputs.version }} VERSION=${{ steps.meta.outputs.version }}
+        run: make docker-buildx IMG=drpsychick/mailu-operator:${{ steps.meta.outputs.version }} VERSION=${{ steps.meta.outputs.version }}
 
       - name: Build operator install manifest
         env:
