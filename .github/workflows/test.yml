@@ -11,7 +11,7 @@ env:
 
 jobs:
   test:
-    name: unit and integration tests
+    name: Lint, test, build and test-e2e with KinD
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
