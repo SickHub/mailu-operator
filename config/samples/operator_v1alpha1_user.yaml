@@ -7,11 +7,12 @@ metadata:
   name: user-sample
 spec:
   # --> email: $name@$domain
+  name: test
+  domain: example.com
   # allowSpoofing: false
   changePassword: false
   comment: "test user"
   displayedName: "test@example.com"
-  domain: example.com
   enabled: true
   enableIMAP: false
   enablePOP: false
@@ -19,9 +20,8 @@ spec:
   # forwardDestination: "test@example.com"
   # forwardKeep: false
   # globalAdmin: false
-  name: test
   quotaBytes: -1
-  # rawPassword: "s3cr3t!"
+  rawPassword: "s3cr3t!"
   # passwordSecret: "mailu-users"
   # passwordKey: "test@example.com"
   # replyEnabled: false

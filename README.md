@@ -110,21 +110,48 @@ Aliases are used to route emails for multiple email addresses to a user (email) 
 
 As this project is brand new and in alpha stage, here are the current steps to try it out:
 
+1. get and apply the `install.yaml` which contains the CRDs and the deployment of the operator.
+2. edit the deployment to configure `MAILU_API` and `MAILU_TOKEN` environment variables.
+3. create `Domain`, `User` and `Alias` resources that will be applied to your Mailu instance.
+
 ```shell
-REGISTRY=<your-registry>
-# 1. build the image and push it to your own registry
-make docker-buildx IMG=$REGISTRY/mailu-operator:v0.0.1
+LATEST=https://raw.githubusercontent.com/SickHub/mailu-operator/main/dist/install.yaml
+RELEASE=https://raw.githubusercontent.com/SickHub/mailu-operator/v0.0.2/dist/install.yaml
+NAMESPACE=mailu
+kubectl apply -n $NAMESPACE -f $RELEASE
 
-# 2. build the `install.yaml` used to deploy the operator (including CRDs, Roles and Deployment)
-make build-installer IMG=$REGISTRY/mailu-operator:v0.0.1
+# edit the deployment and set your Mailu API url and token
+kubectl -n $NAMESPACE edit deployment mailu-operator-controller-manager
 
-# 3. apply the `install.yaml` to your k8s cluster
-kubectl apply -f dist/install.yaml
+# now you can add Domain, User and Alias resources
+kubectl apply -n $NAMESPACE -f config/samples/operator_v1alpha1_domain.yaml
+kubectl apply -n $NAMESPACE -f config/samples/operator_v1alpha1_user.yaml
+kubectl apply -n $NAMESPACE -f config/samples/operator_v1alpha1_alias.yaml
+
+# remove the operator again
+kubectl delete -n $NAMESPACE -f $RELEASE
 ```
 
-Uninstall
+Build and install the operator from your fork:
 ```shell
-kubectl delete -f dist/install.yaml
+REGISTRY=<your-registry>
+NAMESPACE=mailu
+# 1. build the image and push it to your own registry
+make docker-buildx IMG=$REGISTRY/mailu-operator:dev
+
+# 2. build the `install.yaml` used to deploy the operator (including CRDs, Roles and Deployment)
+make build-installer IMG=$REGISTRY/mailu-operator:dev
+
+# 3. apply the `install.yaml` to your k8s cluster
+kubectl apply -n $NAMESPACE -f dist/install.yaml
+
+# 4. edit the `MAILU_API` and `MAILU_TOKEN` environment variables
+kubectl -n $NAMESPACE edit deployment mailu-operator-controller-manager
+```
+
+Uninstall the operator
+```shell
+kubectl delete -n $NAMESPACE -f dist/install.yaml
 ```
 
 ## Development: Build and deploy on your cluster
@@ -190,28 +217,23 @@ make uninstall
 make undeploy
 ```
 
-## Project Distribution
+## Releasing / Project Distribution
 
 Following are the steps to build the installer and distribute this project to users.
 
-1. Build the installer for the image built and published in the registry:
+1. Build the installer for the release tag:
 
 ```sh
-make build-installer IMG=<some-registry>/mailu-operator:tag
+VERSION=0.0.2 make build-installer
 ```
 
-NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without
-its dependencies.
+2. Create a Pull-Request with the changes
+  - at least `dist/install.yaml` and `config/manager/kustomization.yaml` containing the latest tag
 
-2. Using the installer
+3. Merge the Pull-Request
+  - the image will be built and pushed to docker hub
+  - a release with be created with generated release notes
 
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/mailu-operator/<tag or branch>/dist/install.yaml
-```
 
 ## Contributing
 // TODO(user): Add detailed information on how you would like others to contribute to this project
