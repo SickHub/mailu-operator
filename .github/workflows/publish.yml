@@ -3,6 +3,7 @@ name: Publish
 on:
   push:
     branches: [ main ]
+    tags: [ '*' ]
 
 env:
   GO_VERSION: ~1.22
