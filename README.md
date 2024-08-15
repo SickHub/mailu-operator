@@ -199,6 +199,7 @@ kubectl apply -k config/samples/
 >**NOTE**: Ensure that the samples has default values to test it out.
 
 ### To Uninstall
+
 **Delete the instances (CRs) from the cluster:**
 
 ```sh
@@ -220,25 +221,27 @@ make undeploy
 ## Releasing / Project Distribution
 
 Following are the steps to build the installer and distribute this project to users.
+It is generally advised to **create a fork** of the repo and create Pull-Requests from your fork.
 
 1. Build the installer for the release tag:
     ```sh
+    git checkout -b release-0.0.2
     VERSION=0.0.2 make build-installer
     ```
 
-2. Create a Pull-Request with the changes
+2. Create a Pull-Request on GitHub with the changes
     - at least `dist/install.yaml` and `config/manager/kustomization.yaml` containing the latest tag
 
-3. Merge the Pull-Request
+3. Get the Pull-Request reviewed/approved and merged
     - the image will be built and pushed to docker hub
     - a release with be created with generated release notes
 
 4. Push the tag
     ```shell
+    git checkout main
     git tag v0.0.2
     git push
     ```
-
 
 ## Contributing
 // TODO(user): Add detailed information on how you would like others to contribute to this project
@@ -246,20 +249,3 @@ Following are the steps to build the installer and distribute this project to us
 **NOTE:** Run `make help` for more information on all potential `make` targets
 
 More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
