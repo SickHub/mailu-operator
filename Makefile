@@ -5,10 +5,6 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
 
-GOPROXY := https://athens.prod.k8s.rootcrew.net
-GONOSUMDB := gitlab.rootcrew.net
-ATHENS_NETRC := "machine athens.prod.k8s.rootcrew.net login athens password Gi4aaK7Oong.ae2bu3Ge"
-
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -146,7 +142,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} --build-arg GOPROXY=${GOPROXY} --build-arg GONOSUMDB=${GONOSUMDB} --build-arg ATHENS_NETRC=${ATHENS_NETRC} .
+	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
