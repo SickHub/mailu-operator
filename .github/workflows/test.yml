@@ -1,0 +1,33 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  GO_VERSION: ~1.22
+
+jobs:
+  test:
+    name: unit and integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - name: Unit tests
+        run: make test
+
+      - name: Create KinD
+        uses: helm/kind-action@v1
+
+      - name: E2E tests
+        run: make test-e2e
