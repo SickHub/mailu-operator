@@ -1,3 +1,18 @@
+[![Workflow Status](https://img.shields.io/github/actions/workflow/status/sickhub/mailu-operator/publish.yml)](https://github.com/SickHub/mailu-operator/actions)
+[![Docker image](https://img.shields.io/docker/image-size/drpsychick/mailu-operator?sort=date)](https://hub.docker.com/r/drpsychick/mailu-operator/tags)
+[![DockerHub pulls](https://img.shields.io/docker/pulls/drpsychick/mailu-operator.svg)](https://hub.docker.com/r/drpsychick/mailu-operator/)
+[![DockerHub stars](https://img.shields.io/docker/stars/drpsychick/mailu-operator.svg)](https://hub.docker.com/r/drpsychick/mailu-operator/)
+[![GitHub stars](https://img.shields.io/github/stars/sickhub/mailu-operator.svg)](https://github.com/sickhub/mailu-operator)
+[![Contributors](https://img.shields.io/github/contributors/sickhub/mailu-operator.svg)](https://github.com/sickhub/mailu-operator/graphs/contributors)
+[![Paypal](https://img.shields.io/badge/donate-paypal-00457c.svg?logo=paypal)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=FTXDN7LCDWUEA&source=url)
+[![GitHub Sponsor](https://img.shields.io/badge/github-sponsor-blue?logo=github)](https://github.com/sponsors/DrPsychick)
+
+[![GitHub issues](https://img.shields.io/github/issues/sickhub/mailu-operator.svg)](https://github.com/sickhub/mailu-operator/issues)
+[![GitHub closed issues](https://img.shields.io/github/issues-closed/sickhub/mailu-operator.svg)](https://github.com/sickhub/mailu-operator/issues?q=is%3Aissue+is%3Aclosed)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/sickhub/mailu-operator.svg)](https://github.com/sickhub/mailu-operator/pulls)
+[![GitHub closed pull requests](https://img.shields.io/github/issues-pr-closed/sickhub/mailu-operator.svg)](https://github.com/sickhub/mailu-operator/pulls?q=is%3Apr+is%3Aclosed)
+
+
 # mailu-operator
 
 The purpose of this project is to define Email Domains, Users and Aliases used in Mailu via CRs.
