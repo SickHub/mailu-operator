@@ -27,12 +27,13 @@ type UserSpec struct {
 	ChangePassword bool   `json:"changePassword,omitempty"`
 	Comment        string `json:"comment,omitempty"`
 	DisplayedName  string `json:"displayedName,omitempty"`
+	// TODO validate with regex?
 	Domain         string `json:"domain"`
 	Enabled        bool   `json:"enabled,omitempty"`
 	EnableIMAP     bool   `json:"enableIMAP,omitempty"`
 	EnablePOP      bool   `json:"enablePOP,omitempty"`
 	ForwardEnabled bool   `json:"forwardEnabled,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// TODO validate with regex
 	ForwardDestination []string `json:"forwardDestination,omitempty"`
 	ForwardKeep        bool     `json:"forwardKeep,omitempty"`
 	GlobalAdmin        bool     `json:"globalAdmin,omitempty"`

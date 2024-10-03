@@ -23,19 +23,18 @@ import (
 // DomainSpec defines the desired state of Domain
 type DomainSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	Name string `json:"name"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Domain name.
+	// TODO use a simplified regex to validate?
+	Name    string `json:"name"`
 	Comment string `json:"comment,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// -1 ... x
 	MaxUsers int `json:"maxUsers,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// -1 ... x
 	MaxAliases int `json:"maxAliases,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	MaxQuotaBytes int `json:"maxQuotaBytes,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	SignupEnabled bool `json:"signupEnabled,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	Alternatives []string `json:"alternatives,omitempty"`
+	// ?
+	MaxQuotaBytes int      `json:"maxQuotaBytes,omitempty"`
+	SignupEnabled bool     `json:"signupEnabled,omitempty"`
+	Alternatives  []string `json:"alternatives,omitempty"`
 }
 
 // DomainStatus defines the observed state of Domain

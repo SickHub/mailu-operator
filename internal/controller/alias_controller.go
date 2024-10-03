@@ -40,6 +40,10 @@ import (
 	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
 )
 
+const (
+	AliasConditionTypeReady = "AliasReady"
+)
+
 // AliasReconciler reconciles a Alias object
 type AliasReconciler struct {
 	client.Client
@@ -137,24 +141,11 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 			switch response.StatusCode {
 			case http.StatusBadRequest:
-				// TODO: define consistent conditions/types that make sense (Created, Updated, Deleted?) https://maelvls.dev/kubernetes-conditions/
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Alias creation failed: " + string(body)})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to create alias: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
+				fallthrough
 			case http.StatusConflict:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Alias creation failed: " + string(body)})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to create alias: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
+				fallthrough
 			case http.StatusNotFound:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Alias creation failed: " + string(body)})
+				meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Created", "Alias create failed: "+string(body)))
 				err = r.Status().Update(ctx, alias)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -162,7 +153,7 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				logr.Error(err, fmt.Sprintf("failed to create alias: %d %s", response.StatusCode, body))
 				return ctrl.Result{Requeue: false}, nil
 			case http.StatusOK:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Created", Message: "Alias created"})
+				meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionTrue, "Created", "Alias create successful"))
 				err = r.Status().Update(ctx, alias)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -170,7 +161,7 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				logr.Info(fmt.Sprintf("alias %s created", email))
 				return ctrl.Result{}, nil
 			default:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Alias creation failed: " + string(body)})
+				meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Created", "Alias create failed: "+string(body)))
 				err = r.Status().Update(ctx, alias)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -215,15 +206,9 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 			switch response.StatusCode {
 			case http.StatusBadRequest:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Alias update failed: " + string(body)})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to create alias: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
+				fallthrough
 			case http.StatusConflict:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Alias update failed: " + string(body)})
+				meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Updated", "Alias update failed: "+string(body)))
 				err = r.Status().Update(ctx, alias)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -231,7 +216,7 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				logr.Error(err, fmt.Sprintf("failed to create alias: %d %s", response.StatusCode, body))
 				return ctrl.Result{Requeue: false}, nil
 			case http.StatusOK:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Alias updated"})
+				meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionTrue, "Updated", "Alias update successful"))
 				err = r.Status().Update(ctx, alias)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -239,7 +224,7 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				logr.Info(fmt.Sprintf("alias %s updated", email))
 				return ctrl.Result{}, nil
 			default:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Alias update failed: " + string(body)})
+				meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Updated", "Alias update failed: "+string(body)))
 				err = r.Status().Update(ctx, alias)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -274,6 +259,15 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func getReadyCondition(status metav1.ConditionStatus, reason, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:    AliasConditionTypeReady,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.

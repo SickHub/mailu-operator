@@ -40,16 +40,29 @@ spec:
             description: AliasSpec defines the desired state of Alias
             properties:
               comment:
+                description: Comment for the alias.
                 type: string
               destination:
+                description: |-
+                  Destination(s) for e-mails to 'name@domain'.
+                  TODO use a simplified regex to validate?
                 items:
                   type: string
                 type: array
               domain:
+                description: |-
+                  Domain part of e-mail address 'name@domain'.
+                  TODO use regex to validate? https://stackoverflow.com/questions/10306690/what-is-a-regular-expression-which-will-match-a-valid-domain-name-without-a-subd
+                  ^(((?!-))(xn--|_)?[a-z0-9-]{0,61}[a-z0-9]{1,1}\.)*(xn--)?([a-z0-9][a-z0-9\-]{0,60}|[a-z0-9-]{1,30}\.[a-z]{2,})$
                 type: string
               name:
+                description: |-
+                  Name part of e-mail address 'name@domain'.
+                  TODO use a simplified regex to validate?
                 type: string
               wildcard:
+                description: Set to 'true' if the name contains wildcard character
+                  '%'.
                 type: boolean
             required:
             - domain

@@ -46,12 +46,18 @@ spec:
               comment:
                 type: string
               maxAliases:
+                description: -1 ... x
                 type: integer
               maxQuotaBytes:
+                description: '?'
                 type: integer
               maxUsers:
+                description: -1 ... x
                 type: integer
               name:
+                description: |-
+                  Domain name.
+                  TODO use a simplified regex to validate?
                 type: string
               signupEnabled:
                 type: boolean

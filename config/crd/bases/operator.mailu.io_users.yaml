@@ -48,6 +48,7 @@ spec:
               displayedName:
                 type: string
               domain:
+                description: TODO validate with regex?
                 type: string
               enableIMAP:
                 type: boolean
@@ -56,6 +57,7 @@ spec:
               enabled:
                 type: boolean
               forwardDestination:
+                description: TODO validate with regex
                 items:
                   type: string
                 type: array
