@@ -23,9 +23,9 @@ issues:
 linters:
   disable-all: true
   enable:
+    # - exportloopref # deprecated
     - dupl
     - errcheck
-    - exportloopref
     - goconst
     - gocyclo
     - gofmt

@@ -1,4 +1,4 @@
-package controller
+package controller_test
 
 import (
 	"fmt"
@@ -8,6 +8,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/ghttp"
+
+	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
 	"github.com/sickhub/mailu-operator/pkg/mailu"
 )
 
@@ -322,4 +325,76 @@ func JSONError(rw http.ResponseWriter, c int, m string) {
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(c)
 	_, _ = rw.Write([]byte(fmt.Sprintf(`{"code": %d, "message": "%s"}`, c, m)))
+}
+
+// TODO: refactor to single functions
+// TODO: use ghttp.Server with AppendHandlers
+// WIP: done for alias
+
+var (
+	ResponseOK                 = RespondWith(http.StatusOK, `{"code": 0, "message": "ok"}`)
+	ResponseBadRequest         = RespondWith(http.StatusBadRequest, `{"code": 400, "message": "bad request"}`)
+	ResponseNotFound           = RespondWith(http.StatusNotFound, `{"code": 404, "message": "not found"}`)
+	ResponseInternalError      = RespondWith(http.StatusInternalServerError, `{"code": 500, "message": "internal server error"}`)
+	ResponseUnauthorized       = RespondWith(http.StatusUnauthorized, `{"code": 401, "message": "unauthorized"}`)
+	ResponseForbidden          = RespondWith(http.StatusForbidden, `{"code": 402, "message": "forbidden"}`)
+	ResponseConflict           = RespondWith(http.StatusConflict, `{"code": 409, "message": "conflict"}`)
+	ResponseServiceUnavailable = RespondWith(http.StatusServiceUnavailable, `{"code": 503, "message": "service unavailable"}`)
+)
+
+func getResponse(status int) http.HandlerFunc {
+	switch status {
+	case http.StatusForbidden:
+		return ResponseForbidden
+	case http.StatusUnauthorized:
+		return ResponseUnauthorized
+	case http.StatusBadRequest:
+		return ResponseBadRequest
+	case http.StatusInternalServerError:
+		return ResponseInternalError
+	case http.StatusNotFound:
+		return ResponseNotFound
+	case http.StatusConflict:
+		return ResponseConflict
+	case http.StatusServiceUnavailable:
+		return ResponseServiceUnavailable
+	case http.StatusOK:
+		fallthrough
+	default:
+		return ResponseOK
+	}
+}
+
+func prepareFindAlias(alias *operatorv1alpha1.Alias, status int) {
+	mock.AppendHandlers(CombineHandlers(
+		VerifyRequest("GET", "/alias/"+alias.Spec.Name+"@"+alias.Spec.Domain),
+		getResponse(status),
+	))
+}
+
+func prepareCreateAlias(alias *operatorv1alpha1.Alias, status int) {
+	mock.AppendHandlers(CombineHandlers(
+		VerifyRequest("POST", "/alias"),
+		VerifyJSONRepresenting(mailu.Alias{
+			Email:       alias.Spec.Name + "@" + alias.Spec.Domain,
+			Comment:     &alias.Spec.Comment,
+			Destination: &alias.Spec.Destination,
+			Wildcard:    &alias.Spec.Wildcard,
+		}),
+		getResponse(status),
+	))
+}
+
+func preparePatchAlias(alias *operatorv1alpha1.Alias, status int) {
+	mock.AppendHandlers(CombineHandlers(
+		VerifyRequest("PATCH", "/alias/"+alias.Spec.Name+"@"+alias.Spec.Domain),
+		getResponse(status),
+	))
+}
+
+func prepareDeleteAlias(alias *operatorv1alpha1.Alias, status int) {
+	mock.AppendHandlers(CombineHandlers(
+		VerifyRequest("DELETE", "/alias/"+alias.Spec.Name+"@"+alias.Spec.Domain),
+		getResponse(status),
+	))
 }
