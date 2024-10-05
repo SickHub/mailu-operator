@@ -8,10 +8,8 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
@@ -28,22 +26,6 @@ var _ = Describe("Alias Controller", func() {
 		domain                 string
 	)
 	ctx := context.Background()
-
-	createResource := func(tp interface{}, name, domain string) client.Object {
-		switch tp.(type) {
-		case operatorv1alpha1.Alias:
-			return &operatorv1alpha1.Alias{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
-				Spec:       operatorv1alpha1.AliasSpec{Name: name, Domain: domain},
-			}
-		case operatorv1alpha1.User:
-			return nil
-		case operatorv1alpha1.Domain:
-			return nil
-		default:
-			return nil
-		}
-	}
 
 	reconcile := func(deleted bool) (ctrl.Result, error) {
 		Expect(res).NotTo(BeNil())
@@ -85,7 +67,7 @@ var _ = Describe("Alias Controller", func() {
 
 		When("creating an Alias", func() {
 			BeforeAll(func() {
-				res = createResource(operatorv1alpha1.Alias{}, name, domain).(*operatorv1alpha1.Alias)
+				res = CreateResource(operatorv1alpha1.Alias{}, name, domain).(*operatorv1alpha1.Alias)
 				err := k8sClient.Create(ctx, res)
 				Expect(err).ToNot(HaveOccurred())
 			})

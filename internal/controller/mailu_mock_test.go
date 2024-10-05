@@ -9,6 +9,8 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/ghttp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
 	"github.com/sickhub/mailu-operator/pkg/mailu"
@@ -342,6 +344,28 @@ var (
 	ResponseServiceUnavailable = RespondWith(http.StatusServiceUnavailable, `{"code": 503, "message": "service unavailable"}`)
 )
 
+func CreateResource(obj interface{}, name, domain string) client.Object {
+	switch obj.(type) {
+	case operatorv1alpha1.Alias:
+		return &operatorv1alpha1.Alias{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			Spec:       operatorv1alpha1.AliasSpec{Name: name, Domain: domain},
+		}
+	case operatorv1alpha1.User:
+		return &operatorv1alpha1.User{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			Spec:       operatorv1alpha1.UserSpec{Name: name, Domain: domain},
+		}
+	case operatorv1alpha1.Domain:
+		return &operatorv1alpha1.Domain{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			Spec:       operatorv1alpha1.DomainSpec{Name: domain},
+		}
+	default:
+		return nil
+	}
+}
+
 func getResponse(status int) http.HandlerFunc {
 	switch status {
 	case http.StatusForbidden:
@@ -365,6 +389,7 @@ func getResponse(status int) http.HandlerFunc {
 	}
 }
 
+// Alias
 func prepareFindAlias(alias *operatorv1alpha1.Alias, status int) {
 	mock.AppendHandlers(CombineHandlers(
 		VerifyRequest("GET", "/alias/"+alias.Spec.Name+"@"+alias.Spec.Domain),
@@ -395,6 +420,43 @@ func preparePatchAlias(alias *operatorv1alpha1.Alias, status int) {
 func prepareDeleteAlias(alias *operatorv1alpha1.Alias, status int) {
 	mock.AppendHandlers(CombineHandlers(
 		VerifyRequest("DELETE", "/alias/"+alias.Spec.Name+"@"+alias.Spec.Domain),
+		getResponse(status),
+	))
+}
+
+// Domain
+func prepareFindDomain(domain *operatorv1alpha1.Domain, status int) {
+	mock.AppendHandlers(CombineHandlers(
+		VerifyRequest("GET", "/domain/"+domain.Spec.Name),
+		getResponse(status),
+	))
+}
+
+func prepareCreateDomain(domain *operatorv1alpha1.Domain, status int) {
+	mock.AppendHandlers(CombineHandlers(
+		VerifyRequest("POST", "/domain"),
+		VerifyJSONRepresenting(mailu.Domain{
+			Name:          domain.Spec.Name,
+			Comment:       &domain.Spec.Comment,
+			MaxAliases:    &domain.Spec.MaxAliases,
+			MaxQuotaBytes: &domain.Spec.MaxQuotaBytes,
+			MaxUsers:      &domain.Spec.MaxUsers,
+			SignupEnabled: &domain.Spec.SignupEnabled,
+		}),
+		getResponse(status),
+	))
+}
+
+func preparePatchDomain(domain *operatorv1alpha1.Domain, status int) {
+	mock.AppendHandlers(CombineHandlers(
+		VerifyRequest("PATCH", "/domain/"+domain.Spec.Name),
+		getResponse(status),
+	))
+}
+
+func prepareDeleteDomain(domain *operatorv1alpha1.Domain, status int) {
+	mock.AppendHandlers(CombineHandlers(
+		VerifyRequest("DELETE", "/domain/"+domain.Spec.Name),
 		getResponse(status),
 	))
 }

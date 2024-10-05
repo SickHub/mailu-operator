@@ -31,7 +31,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	openapi_types "github.com/oapi-codegen/runtime/types"
+	openapitypes "github.com/oapi-codegen/runtime/types"
 	"github.com/sickhub/mailu-operator/pkg/mailu"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -77,7 +77,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		req.Header.Add("Authorization", "Bearer "+r.ApiToken)
 		return nil
 	}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-		body := []byte{}
+		body := make([]byte, 0)
 		if req.Body != nil {
 			body, _ = io.ReadAll(req.Body) //nolint:errcheck
 			req.Body = io.NopCloser(bytes.NewBuffer(body))
@@ -114,8 +114,8 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	if user.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Add a finalizer if not present
-		if !controllerutil.ContainsFinalizer(user, finalizerName) {
-			user.ObjectMeta.Finalizers = append(user.ObjectMeta.Finalizers, finalizerName)
+		if !controllerutil.ContainsFinalizer(user, FinalizerName) {
+			user.ObjectMeta.Finalizers = append(user.ObjectMeta.Finalizers, FinalizerName)
 			if err := r.Update(ctx, user); err != nil {
 				//log.Error(err, "unable to update Tenant")
 				return ctrl.Result{Requeue: true}, err
@@ -275,7 +275,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		}
 	}
 
-	if controllerutil.ContainsFinalizer(user, finalizerName) {
+	if controllerutil.ContainsFinalizer(user, FinalizerName) {
 		// Domain removed -> delete
 		if find.StatusCode != http.StatusNotFound {
 			res, err := api.DeleteUser(ctx, user.Spec.Name+"@"+user.Spec.Domain)
@@ -287,7 +287,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 		}
 
-		controllerutil.RemoveFinalizer(user, finalizerName)
+		controllerutil.RemoveFinalizer(user, FinalizerName)
 		if err := r.Update(ctx, user); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -339,7 +339,7 @@ func (r *UserReconciler) userFromSpec(spec operatorv1alpha1.UserSpec) (mailu.Use
 
 	// convert Dates if set
 	if spec.ReplyStartDate != "" {
-		d := &openapi_types.Date{}
+		d := &openapitypes.Date{}
 		err := d.UnmarshalText([]byte(spec.ReplyStartDate))
 		if err != nil {
 			return mailu.User{}, err
@@ -347,7 +347,7 @@ func (r *UserReconciler) userFromSpec(spec operatorv1alpha1.UserSpec) (mailu.Use
 		u.ReplyStartDate = d
 	}
 	if spec.ReplyEndDate != "" {
-		d := &openapi_types.Date{}
+		d := &openapitypes.Date{}
 		err := d.UnmarshalText([]byte(spec.ReplyEndDate))
 		if err != nil {
 			return mailu.User{}, err

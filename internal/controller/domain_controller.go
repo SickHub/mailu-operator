@@ -1,19 +1,3 @@
-/*
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
@@ -40,7 +24,7 @@ import (
 )
 
 const (
-	finalizerName = "operator.mailu.io/finalizer"
+	DomainConditionTypeReady = "DomainReady"
 )
 
 // DomainReconciler reconciles a Domain object
@@ -73,7 +57,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		req.Header.Add("Authorization", "Bearer "+r.ApiToken)
 		return nil
 	}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-		body := []byte{}
+		body := make([]byte, 0)
 		if req.Body != nil {
 			body, _ = io.ReadAll(req.Body) //nolint:errcheck
 			req.Body = io.NopCloser(bytes.NewBuffer(body))
@@ -108,8 +92,8 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if domain.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Add a finalizer if not present
-		if !controllerutil.ContainsFinalizer(domain, finalizerName) {
-			domain.ObjectMeta.Finalizers = append(domain.ObjectMeta.Finalizers, finalizerName)
+		if !controllerutil.ContainsFinalizer(domain, FinalizerName) {
+			domain.ObjectMeta.Finalizers = append(domain.ObjectMeta.Finalizers, FinalizerName)
 			if err := r.Update(ctx, domain); err != nil {
 				//log.Error(err, "unable to update Tenant")
 				return ctrl.Result{Requeue: true}, err
@@ -148,7 +132,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			switch response.StatusCode {
 			case http.StatusBadRequest:
 				// TODO: define consistent conditions/types that make sense (Created, Updated, Deleted?) https://maelvls.dev/kubernetes-conditions/
-				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Domain creation failed: " + string(body)})
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: DomainConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Created", Message: "Domain creation failed: " + string(body)})
 				err = r.Status().Update(ctx, domain)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -156,7 +140,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				logr.Error(err, fmt.Sprintf("bad request: %d %s", response.StatusCode, body))
 				return ctrl.Result{Requeue: false}, nil
 			case http.StatusConflict:
-				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Domain creation failed: " + string(body)})
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: DomainConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Created", Message: "Domain creation failed: " + string(body)})
 				err = r.Status().Update(ctx, domain)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -164,7 +148,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				logr.Error(err, fmt.Sprintf("conflicting domain / alternative during create: %d %s", response.StatusCode, body))
 				return ctrl.Result{Requeue: false}, nil
 			case http.StatusOK:
-				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Created", Message: "Domain created"})
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: DomainConditionTypeReady, Status: metav1.ConditionTrue, Reason: "Created", Message: "Domain created"})
 				err = r.Status().Update(ctx, domain)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -174,7 +158,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				// api.GenerateDomainKeys(domain.Spec.Name)
 				return ctrl.Result{}, nil
 			default:
-				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Domain creation failed: " + string(body)})
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: DomainConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Created", Message: "Domain creation failed: " + string(body)})
 				err = r.Status().Update(ctx, domain)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -217,8 +201,8 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			if foundDom.Alternatives != nil && dom.Alternatives != nil {
 				m := make(map[string]bool)
 				n := make(map[string]bool)
-				alts := []string{}
-				removeAlts := []string{}
+				alts := make([]string, 0)
+				removeAlts := make([]string, 0)
 
 				for _, val := range *foundDom.Alternatives {
 					m[val] = true
@@ -251,7 +235,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				}
 
 				if len(removeAlts) > 0 {
-					meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Domain alternatives updated"})
+					meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: DomainConditionTypeReady, Status: metav1.ConditionTrue, Reason: "Updated", Message: "Domain alternatives updated"})
 					err = r.Status().Update(ctx, domain)
 					if err != nil {
 						return ctrl.Result{Requeue: true}, err
@@ -283,7 +267,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 			switch response.StatusCode {
 			case http.StatusBadRequest:
-				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Updated", Message: "Domain update failed: " + string(body)})
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: DomainConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Updated", Message: "Domain update failed: " + string(body)})
 				err = r.Status().Update(ctx, domain)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -291,7 +275,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				logr.Error(err, fmt.Sprintf("failed to update domain: %d %s", response.StatusCode, body))
 				return ctrl.Result{Requeue: false}, nil
 			case http.StatusConflict:
-				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Updated", Message: "Domain update failed: " + string(body)})
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: DomainConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Updated", Message: "Domain update failed: " + string(body)})
 				err = r.Status().Update(ctx, domain)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -299,7 +283,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				logr.Error(err, fmt.Sprintf("failed to update domain: %d %s", response.StatusCode, body))
 				return ctrl.Result{Requeue: false}, nil
 			case http.StatusOK:
-				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Domain updated"})
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: DomainConditionTypeReady, Status: metav1.ConditionTrue, Reason: "Updated", Message: "Domain updated"})
 				err = r.Status().Update(ctx, domain)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -310,7 +294,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				// api.GenerateDomainKeys(domain.Spec.Name)
 				return ctrl.Result{}, nil
 			default:
-				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Updated", Message: "Domain update failed: " + string(body)})
+				meta.SetStatusCondition(&domain.Status.Conditions, metav1.Condition{Type: DomainConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Updated", Message: "Domain update failed: " + string(body)})
 				err = r.Status().Update(ctx, domain)
 				if err != nil {
 					return ctrl.Result{Requeue: true}, err
@@ -325,7 +309,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	if controllerutil.ContainsFinalizer(domain, finalizerName) {
+	if controllerutil.ContainsFinalizer(domain, FinalizerName) {
 		// Domain removed -> delete
 		if find.StatusCode != http.StatusNotFound {
 			res, err := api.DeleteDomain(ctx, domain.Spec.Name)
@@ -337,7 +321,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			}
 		}
 
-		controllerutil.RemoveFinalizer(domain, finalizerName)
+		controllerutil.RemoveFinalizer(domain, FinalizerName)
 		if err := r.Update(ctx, domain); err != nil {
 			return ctrl.Result{}, err
 		}
