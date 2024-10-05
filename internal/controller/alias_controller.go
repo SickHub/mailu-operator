@@ -163,7 +163,7 @@ func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Al
 		return ctrl.Result{}, nil
 	}
 
-	retry, err := r.updateAlias(ctx, alias)
+	retry, err := r.updateAlias(ctx, newAlias)
 	if err != nil {
 		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
@@ -261,14 +261,8 @@ func (r *AliasReconciler) createAlias(ctx context.Context, alias *operatorv1alph
 	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
 }
 
-func (r *AliasReconciler) updateAlias(ctx context.Context, alias *operatorv1alpha1.Alias) (bool, error) {
-	email := alias.Spec.Name + "@" + alias.Spec.Domain
-	res, err := r.ApiClient.UpdateAlias(ctx, email, mailu.Alias{
-		Email:       email,
-		Comment:     &alias.Spec.Comment,
-		Destination: &alias.Spec.Destination,
-		Wildcard:    &alias.Spec.Wildcard,
-	})
+func (r *AliasReconciler) updateAlias(ctx context.Context, newAlias mailu.Alias) (bool, error) {
+	res, err := r.ApiClient.UpdateAlias(ctx, newAlias.Email, newAlias)
 	if err != nil {
 		return false, err
 	}
