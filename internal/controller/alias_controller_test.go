@@ -90,7 +90,7 @@ var _ = Describe("Alias Controller", func() {
 				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
 				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
 				Expect(result.Requeue).To(BeTrue())
-				//Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
 			})
 
 			It("updates status, if a permanent error occurs", func() {
@@ -99,8 +99,9 @@ var _ = Describe("Alias Controller", func() {
 				_, err := reconcile(false)
 				Expect(err).NotTo(HaveOccurred())
 
-				condition := meta.FindStatusCondition(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)
+				Expect(result.Requeue).To(BeFalse())
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
+				condition := meta.FindStatusCondition(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)
 				Expect(condition.Reason).To(Equal("Error"))
 			})
 		})
@@ -121,20 +122,6 @@ var _ = Describe("Alias Controller", func() {
 
 				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
-			})
-		})
-
-		When("receiving an error from the API", func() {
-			It("updates the status upon failure", func() {
-				prepareFindAlias(resAfterReconciliation, http.StatusNotFound)
-				prepareCreateAlias(resAfterReconciliation, http.StatusConflict)
-
-				res = resAfterReconciliation
-				_, err := reconcile(false)
-				Expect(err).To(HaveOccurred())
-
-				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
-				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
 			})
 		})
 
@@ -165,9 +152,15 @@ var _ = Describe("Alias Controller", func() {
 				res = CreateResource(operatorv1alpha1.Alias{}, name, domain).(*operatorv1alpha1.Alias)
 				err := k8sClient.Create(ctx, res)
 				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("finds an existing alias, updates status and adds a finalizer", func() {
+				Expect(res.GetFinalizers()).To(HaveLen(0))
+				Expect(res.Status.Conditions).To(HaveLen(0))
+
 				prepareFindAlias(res, http.StatusOK)
 				preparePatchAlias(res, http.StatusOK)
 

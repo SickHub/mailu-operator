@@ -71,7 +71,7 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, alias *operatorv1alpha1
 		return result, err
 	}
 
-	if aliasOriginal.DeletionTimestamp != nil && result.Requeue == false {
+	if aliasOriginal.DeletionTimestamp != nil && !result.Requeue {
 		controllerutil.RemoveFinalizer(alias, FinalizerName)
 	}
 
@@ -107,8 +107,9 @@ func (r *AliasReconciler) reconcile(ctx context.Context, alias *operatorv1alpha1
 			logr.Info(fmt.Errorf("failed to get alias, requeueing: %w", err).Error())
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
-		logr.Error(err, "failed to get alias")
+		// we explicitly set the error in the status only on a permanent (non-retryable) error
 		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		logr.Error(err, "failed to get alias")
 		return ctrl.Result{}, nil
 	}
 
@@ -133,18 +134,18 @@ func (r *AliasReconciler) create(ctx context.Context, alias *operatorv1alpha1.Al
 
 	retry, err := r.createAlias(ctx, alias)
 	if err != nil {
+		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to create alias, requeueing: %w", err).Error())
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to create alias")
-		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		return ctrl.Result{}, err
 	}
 
 	meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionTrue, "Created", "Alias created in MailU"))
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{Requeue: retry}, nil
 }
 
 func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Alias, apiAlias *mailu.Alias) (ctrl.Result, error) {
@@ -164,18 +165,18 @@ func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Al
 
 	retry, err := r.updateAlias(ctx, alias)
 	if err != nil {
+		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to update alias, requeueing: %w", err).Error())
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to update alias")
-		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		return ctrl.Result{}, err
 	}
 
 	meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{Requeue: retry}, nil
 }
 
 func (r *AliasReconciler) delete(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
@@ -184,16 +185,16 @@ func (r *AliasReconciler) delete(ctx context.Context, alias *operatorv1alpha1.Al
 
 	retry, err := r.deleteAlias(ctx, alias)
 	if err != nil {
+		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to delete alias, requeueing: %w", err).Error())
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to delete alias")
-		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{Requeue: retry}, nil
 }
 
 func (r *AliasReconciler) getAlias(ctx context.Context, alias *operatorv1alpha1.Alias) (*mailu.Alias, bool, error) {
@@ -244,14 +245,17 @@ func (r *AliasReconciler) createAlias(ctx context.Context, alias *operatorv1alph
 		return false, err
 	}
 	switch res.StatusCode {
+	case http.StatusCreated:
+		fallthrough
 	case http.StatusOK:
 		return false, nil
 	case http.StatusConflict:
-		return false, errors.New("alias already exists")
+		// treat conflict as success -> requeue will trigger an update
+		return true, nil
 	case http.StatusInternalServerError:
 		return false, errors.New("internal server error")
 	case http.StatusServiceUnavailable:
-		return true, nil
+		return true, errors.New("service unavailable")
 	}
 
 	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
@@ -276,12 +280,14 @@ func (r *AliasReconciler) updateAlias(ctx context.Context, alias *operatorv1alph
 	}
 
 	switch res.StatusCode {
+	case http.StatusNoContent:
+		fallthrough
 	case http.StatusOK:
 		return false, nil
 	case http.StatusInternalServerError:
 		return false, errors.New("internal server error")
 	case http.StatusServiceUnavailable:
-		return true, nil
+		return true, errors.New("service unavailable")
 	}
 
 	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
@@ -300,12 +306,14 @@ func (r *AliasReconciler) deleteAlias(ctx context.Context, alias *operatorv1alph
 	}
 
 	switch res.StatusCode {
+	case http.StatusNotFound:
+		fallthrough
 	case http.StatusOK:
 		return false, nil
 	case http.StatusInternalServerError:
 		return false, errors.New("internal server error")
 	case http.StatusServiceUnavailable:
-		return true, nil
+		return true, errors.New("service unavailable")
 	}
 
 	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
