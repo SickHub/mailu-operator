@@ -75,9 +75,18 @@ func getResponse(status int) http.HandlerFunc {
 
 // Alias
 func prepareFindAlias(alias *operatorv1alpha1.Alias, status int) {
+	response := getResponse(status)
+	if status == http.StatusOK {
+		response = RespondWithJSONEncoded(http.StatusOK, mailu.Alias{
+			Email:       alias.Spec.Name + "@" + alias.Spec.Domain,
+			Comment:     &alias.Spec.Comment,
+			Destination: &alias.Spec.Destination,
+			Wildcard:    &alias.Spec.Wildcard,
+		})
+	}
 	mock.AppendHandlers(CombineHandlers(
 		VerifyRequest("GET", "/alias/"+alias.Spec.Name+"@"+alias.Spec.Domain),
-		getResponse(status),
+		response,
 	))
 }
 
@@ -110,9 +119,21 @@ func prepareDeleteAlias(alias *operatorv1alpha1.Alias, status int) {
 
 // Domain
 func prepareFindDomain(domain *operatorv1alpha1.Domain, status int) {
+	response := getResponse(status)
+	if status == http.StatusOK {
+		response = RespondWithJSONEncoded(http.StatusOK, mailu.Domain{
+			Name:          domain.Spec.Name,
+			Alternatives:  &domain.Spec.Alternatives,
+			Comment:       &domain.Spec.Comment,
+			MaxAliases:    &domain.Spec.MaxAliases,
+			MaxQuotaBytes: &domain.Spec.MaxQuotaBytes,
+			MaxUsers:      &domain.Spec.MaxUsers,
+			SignupEnabled: &domain.Spec.SignupEnabled,
+		})
+	}
 	mock.AppendHandlers(CombineHandlers(
 		VerifyRequest("GET", "/domain/"+domain.Spec.Name),
-		getResponse(status),
+		response,
 	))
 }
 
@@ -147,9 +168,36 @@ func prepareDeleteDomain(domain *operatorv1alpha1.Domain, status int) {
 
 // User
 func prepareFindUser(user *operatorv1alpha1.User, status int) {
+	response := getResponse(status)
+	if status == http.StatusOK {
+		response = RespondWithJSONEncoded(http.StatusOK, mailu.User{
+			AllowSpoofing:      &user.Spec.AllowSpoofing,
+			ChangePwNextLogin:  &user.Spec.ChangePassword,
+			Comment:            &user.Spec.Comment,
+			DisplayedName:      &user.Spec.DisplayedName,
+			Email:              user.Spec.Name + "@" + user.Spec.Domain,
+			Enabled:            &user.Spec.Enabled,
+			EnableImap:         &user.Spec.EnableIMAP,
+			EnablePop:          &user.Spec.EnablePOP,
+			ForwardDestination: &user.Spec.ForwardDestination,
+			ForwardEnabled:     &user.Spec.ForwardEnabled,
+			ForwardKeep:        &user.Spec.ForwardKeep,
+			GlobalAdmin:        &user.Spec.GlobalAdmin,
+			Password:           &user.Spec.Name,
+			QuotaBytes:         &user.Spec.QuotaBytes,
+			QuotaBytesUsed:     &user.Spec.QuotaBytes,
+			RawPassword:        &user.Spec.Name,
+			ReplyBody:          &user.Spec.ReplyBody,
+			ReplyEnabled:       &user.Spec.ReplyEnabled,
+			ReplySubject:       &user.Spec.ReplySubject,
+			SpamEnabled:        &user.Spec.SpamEnabled,
+			SpamMarkAsRead:     &user.Spec.SpamMarkAsRead,
+			SpamThreshold:      &user.Spec.SpamThreshold,
+		})
+	}
 	mock.AppendHandlers(CombineHandlers(
 		VerifyRequest("GET", "/user/"+user.Spec.Name+"@"+user.Spec.Domain),
-		getResponse(status),
+		response,
 	))
 }
 

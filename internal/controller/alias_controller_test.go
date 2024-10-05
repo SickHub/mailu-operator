@@ -68,7 +68,21 @@ var _ = Describe("Alias Controller", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
+			It("updates the status, if creation fails", func() {
+				prepareFindAlias(res, http.StatusNotFound)
+				prepareCreateAlias(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
+			})
+
 			It("creates the alias, updates status and adds a finalizer", func() {
+				res = resAfterReconciliation.DeepCopy()
 				prepareFindAlias(res, http.StatusNotFound)
 				prepareCreateAlias(res, http.StatusOK)
 
@@ -81,9 +95,9 @@ var _ = Describe("Alias Controller", func() {
 			})
 
 			It("requeues the request, if a retryable error occurs", func() {
-				prepareFindAlias(resAfterReconciliation, http.StatusServiceUnavailable)
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindAlias(res, http.StatusServiceUnavailable)
 
-				res = resAfterReconciliation
 				_, err := reconcile(false)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -94,7 +108,8 @@ var _ = Describe("Alias Controller", func() {
 			})
 
 			It("updates status, if a permanent error occurs", func() {
-				prepareFindAlias(resAfterReconciliation, http.StatusBadRequest)
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindAlias(res, http.StatusBadRequest)
 
 				_, err := reconcile(false)
 				Expect(err).NotTo(HaveOccurred())
@@ -108,14 +123,18 @@ var _ = Describe("Alias Controller", func() {
 
 		When("updating an Alias", func() {
 			BeforeAll(func() {
-				resAfterReconciliation.Spec.Comment = mockComment
-				err := k8sClient.Update(ctx, resAfterReconciliation)
+				res = resAfterReconciliation.DeepCopy()
+				res.Spec.Comment = mockComment
+				err := k8sClient.Update(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("updates the alias", func() {
 				prepareFindAlias(resAfterReconciliation, http.StatusOK)
-				preparePatchAlias(resAfterReconciliation, http.StatusOK)
+				preparePatchAlias(res, http.StatusOK)
 
 				_, err := reconcile(false)
 				Expect(err).ToNot(HaveOccurred())
@@ -123,11 +142,42 @@ var _ = Describe("Alias Controller", func() {
 				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
 			})
+
+			It("does nothing, if there is no change", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindAlias(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
+			})
+
+			It("requeues the request, if a retryable error occurs", func() {
+				res = resAfterReconciliation.DeepCopy()
+				res.Spec.Comment = mockComment + "1"
+				err := k8sClient.Update(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				prepareFindAlias(resAfterReconciliation, http.StatusOK)
+				preparePatchAlias(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment + "1"))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
+			})
 		})
 
 		When("deleting an Alias", func() {
 			BeforeAll(func() {
-				res = resAfterReconciliation
+				res = resAfterReconciliation.DeepCopy()
 				err := k8sClient.Delete(ctx, res)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -135,7 +185,19 @@ var _ = Describe("Alias Controller", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
+			It("requeues the request, if a retryable error occurs", func() {
+				prepareFindAlias(res, http.StatusOK)
+				prepareDeleteAlias(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
+			})
+
 			It("deletes the alias", func() {
+				res = resAfterReconciliation.DeepCopy()
 				prepareFindAlias(res, http.StatusOK)
 				prepareDeleteAlias(res, http.StatusOK)
 
@@ -162,7 +224,6 @@ var _ = Describe("Alias Controller", func() {
 				Expect(res.Status.Conditions).To(HaveLen(0))
 
 				prepareFindAlias(res, http.StatusOK)
-				preparePatchAlias(res, http.StatusOK)
 
 				_, err := reconcile(false)
 				Expect(err).ToNot(HaveOccurred())
@@ -175,7 +236,7 @@ var _ = Describe("Alias Controller", func() {
 
 		When("deleting an Alias that does not exist", func() {
 			BeforeAll(func() {
-				res = resAfterReconciliation
+				res = resAfterReconciliation.DeepCopy()
 				err := k8sClient.Delete(ctx, res)
 				Expect(err).ToNot(HaveOccurred())
 

@@ -48,7 +48,7 @@ type AliasReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
 func (r *AliasReconciler) Reconcile(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
-	logr := log.FromContext(ctx)
+	logr := log.FromContext(ctx, "alias", alias.Name)
 
 	aliasOriginal := alias.DeepCopy()
 
@@ -79,7 +79,7 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, alias *operatorv1alpha1
 }
 
 func (r *AliasReconciler) reconcile(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
-	logr := log.FromContext(ctx)
+	logr := log.FromContext(ctx, "alias", alias.Name)
 
 	if r.ApiClient == nil {
 		api, err := mailu.NewClient(r.ApiURL, mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
@@ -129,7 +129,7 @@ func (r *AliasReconciler) reconcile(ctx context.Context, alias *operatorv1alpha1
 }
 
 func (r *AliasReconciler) create(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
-	logr := log.FromContext(ctx)
+	logr := log.FromContext(ctx, "alias", alias.Name)
 	logr.Info("create alias")
 
 	retry, err := r.createAlias(ctx, alias)
@@ -149,17 +149,24 @@ func (r *AliasReconciler) create(ctx context.Context, alias *operatorv1alpha1.Al
 }
 
 func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Alias, apiAlias *mailu.Alias) (ctrl.Result, error) {
-	logr := log.FromContext(ctx)
+	logr := log.FromContext(ctx, "alias", alias.Name)
 	logr.Info("update alias")
 
 	newAlias := mailu.Alias{
-		Email:       alias.Spec.Name + "@" + alias.Spec.Domain,
-		Comment:     &alias.Spec.Comment,
-		Destination: &alias.Spec.Destination,
-		Wildcard:    &alias.Spec.Wildcard,
+		Email:    alias.Spec.Name + "@" + alias.Spec.Domain,
+		Comment:  &alias.Spec.Comment,
+		Wildcard: &alias.Spec.Wildcard,
+	}
+	if alias.Spec.Destination != nil {
+		newAlias.Destination = &alias.Spec.Destination
 	}
 
-	if reflect.DeepEqual(newAlias, apiAlias) {
+	jsonNew, _ := json.Marshal(newAlias) //nolint:errcheck
+	jsonOld, _ := json.Marshal(apiAlias) //nolint:errcheck
+
+	if reflect.DeepEqual(jsonNew, jsonOld) {
+		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
+		logr.Info("no update needed")
 		return ctrl.Result{}, nil
 	}
 
@@ -180,7 +187,7 @@ func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Al
 }
 
 func (r *AliasReconciler) delete(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
-	logr := log.FromContext(ctx)
+	logr := log.FromContext(ctx, "alias", alias.Name)
 	logr.Info("delete alias")
 
 	retry, err := r.deleteAlias(ctx, alias)
@@ -222,6 +229,10 @@ func (r *AliasReconciler) getAlias(ctx context.Context, alias *operatorv1alpha1.
 		return nil, false, nil
 	case http.StatusBadRequest:
 		return nil, false, errors.New("bad request")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return nil, true, errors.New("gateway timeout")
 	case http.StatusServiceUnavailable:
 		return nil, true, errors.New("service unavailable")
 	}
@@ -254,6 +265,10 @@ func (r *AliasReconciler) createAlias(ctx context.Context, alias *operatorv1alph
 		return true, nil
 	case http.StatusInternalServerError:
 		return false, errors.New("internal server error")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return true, errors.New("gateway timeout")
 	case http.StatusServiceUnavailable:
 		return true, errors.New("service unavailable")
 	}
@@ -280,6 +295,10 @@ func (r *AliasReconciler) updateAlias(ctx context.Context, newAlias mailu.Alias)
 		return false, nil
 	case http.StatusInternalServerError:
 		return false, errors.New("internal server error")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return true, errors.New("gateway timeout")
 	case http.StatusServiceUnavailable:
 		return true, errors.New("service unavailable")
 	}
@@ -306,6 +325,10 @@ func (r *AliasReconciler) deleteAlias(ctx context.Context, alias *operatorv1alph
 		return false, nil
 	case http.StatusInternalServerError:
 		return false, errors.New("internal server error")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return true, errors.New("gateway timeout")
 	case http.StatusServiceUnavailable:
 		return true, errors.New("service unavailable")
 	}
