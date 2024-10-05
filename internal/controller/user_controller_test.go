@@ -3,150 +3,156 @@ package controller_test
 import (
 	"context"
 
+	"net/http"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"github.com/onsi/gomega/ghttp"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
 	. "github.com/sickhub/mailu-operator/internal/controller"
 )
 
 var _ = Describe("User Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+	var (
+		controllerReconciler   *UserReconciler
+		res                    *operatorv1alpha1.User
+		result                 ctrl.Result
+		resAfterReconciliation *operatorv1alpha1.User
+		name                   string
+		user                   string
+	)
+	ctx := context.Background()
 
-		ctx := context.Background()
+	reconcile := func(deleted bool) (ctrl.Result, error) {
+		Expect(res).NotTo(BeNil())
+		Expect(controllerReconciler).NotTo(BeNil())
 
 		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Name:      res.GetName(),
+			Namespace: res.GetNamespace(),
 		}
-		user := &operatorv1alpha1.User{}
-
-		mailuMock := mailuMock()
-
-		BeforeEach(func() {
-			By("creating the custom resource for the Kind User")
-			err := k8sClient.Get(ctx, typeNamespacedName, user)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &operatorv1alpha1.User{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					// TODO(user): Specify other spec details if needed.
-					Spec: operatorv1alpha1.UserSpec{
-						Name:   "foo",
-						Domain: "example.com",
-					},
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-			}
+		var resultErr error
+		result, resultErr = controllerReconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: typeNamespacedName,
 		})
 
-		AfterEach(func() {
-			resource := &operatorv1alpha1.User{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			if err == nil {
-				By("Cleanup the specific resource instance User")
-				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-			}
+		resAfterReconciliation = &operatorv1alpha1.User{}
+		err := k8sClient.Get(ctx, typeNamespacedName, resAfterReconciliation)
+		if !deleted {
+			Expect(err).ToNot(HaveOccurred())
+		}
+
+		return result, resultErr
+	}
+
+	BeforeEach(func() {
+		name = "foo"
+		user = "example.com"
+		mock = ghttp.NewServer()
+
+		Expect(k8sClient).NotTo(BeNil())
+		controllerReconciler = &UserReconciler{
+			Client: k8sClient,
+			Scheme: k8sClient.Scheme(),
+			ApiURL: mock.URL(),
+			//ApiToken: "asdf",
+		}
+	})
+
+	Context("On an empty cluster", Ordered, func() {
+
+		When("creating a User", func() {
+			BeforeAll(func() {
+				res = CreateResource(operatorv1alpha1.User{}, name, user).(*operatorv1alpha1.User)
+				err := k8sClient.Create(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("creates the user, updates status and adds a finalizer", func() {
+				prepareFindUser(res, http.StatusNotFound)
+				prepareCreateUser(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, UserConditionTypeReady)).To(BeTrue())
+			})
 		})
 
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &UserReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				ApiURL:   mailuMock,
-				ApiToken: "asdf",
-			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+		When("creating a User that already exists", func() {
+			BeforeAll(func() {
+				res = CreateResource(operatorv1alpha1.User{}, "existing.com", "existing.com").(*operatorv1alpha1.User)
+				err := k8sClient.Create(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
 			})
-			Expect(err).NotTo(HaveOccurred())
 
-			// reconcile again to cover "update" path
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+			It("finds an existing user, updates status and adds a finalizer", func() {
+				prepareFindUser(res, http.StatusOK)
+				preparePatchUser(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, UserConditionTypeReady)).To(BeTrue())
 			})
-			Expect(err).NotTo(HaveOccurred())
-
-			user := &operatorv1alpha1.User{}
-			err = k8sClient.Get(ctx, typeNamespacedName, user)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(user.Status.Conditions).ToNot(BeEmpty())
 		})
 
-		It("should successfully remove the the resource", func() {
-			By("Reconciling the deleted resource")
-			err := k8sClient.Delete(ctx, user)
-			Expect(err).NotTo(HaveOccurred())
-
-			controllerReconciler := &UserReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				ApiURL:   mailuMock,
-				ApiToken: "asdf",
-			}
-
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+		When("updating a User", func() {
+			BeforeAll(func() {
+				resAfterReconciliation.Spec.Comment = mockComment
+				err := k8sClient.Update(ctx, resAfterReconciliation)
+				Expect(err).ToNot(HaveOccurred())
 			})
-			Expect(err).NotTo(HaveOccurred())
 
-			user := &operatorv1alpha1.User{}
-			err = k8sClient.Get(ctx, typeNamespacedName, user)
-			Expect(err).To(HaveOccurred())
+			It("updates the user", func() {
+				prepareFindUser(resAfterReconciliation, http.StatusOK)
+				preparePatchUser(resAfterReconciliation, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, UserConditionTypeReady)).To(BeTrue())
+			})
 		})
 
-		It("should fail on invalid resource spec", func() {
-			By("Preventing the resource from being created")
-			// TODO: find a better way to create a different resource via JustBeforeEach?
-			controllerReconciler := &UserReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				ApiURL:   mailuMock,
-				ApiToken: "asdf",
-			}
+		When("receiving an error from the API", func() {
+			It("updates the status upon failure", func() {
+				prepareFindUser(resAfterReconciliation, http.StatusNotFound)
+				prepareCreateUser(resAfterReconciliation, http.StatusConflict)
 
-			err := k8sClient.Delete(ctx, user)
-			Expect(err).NotTo(HaveOccurred())
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
 
-			// reconcile to finish deletion of the resource
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, UserConditionTypeReady)).To(BeFalse())
 			})
-			Expect(err).NotTo(HaveOccurred())
+		})
 
-			// try creating the resource with invalid date
-			resource := &operatorv1alpha1.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      resourceName,
-					Namespace: "default",
-				},
-				Spec: operatorv1alpha1.UserSpec{
-					Name:           "foo",
-					Domain:         "example.com",
-					ReplyStartDate: "1900-01-31",
-					ReplyEndDate:   "0000-00-00",
-				},
-			}
-			Expect(k8sClient.Create(ctx, resource)).NotTo(Succeed())
-
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+		When("deleting an User", func() {
+			BeforeAll(func() {
+				err := k8sClient.Delete(ctx, resAfterReconciliation)
+				Expect(err).ToNot(HaveOccurred())
 			})
-			Expect(err).NotTo(HaveOccurred())
 
-			user := &operatorv1alpha1.User{}
-			err = k8sClient.Get(ctx, typeNamespacedName, user)
-			Expect(err).To(HaveOccurred())
+			It("deletes the user", func() {
+				prepareFindUser(resAfterReconciliation, http.StatusOK)
+				prepareDeleteUser(resAfterReconciliation, http.StatusOK)
+
+				_, err := reconcile(true)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation).To(BeComparableTo(&operatorv1alpha1.User{}))
+			})
 		})
 	})
 })

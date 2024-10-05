@@ -245,6 +245,13 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return ctrl.Result{}, nil
 }
 
+// TODO: idea to separte paths in functions
+// TODO: apply status changes at the end, before returning. Returning error triggers requeueing.
+// common: first action is to GET the object from the API, i.e. to see if it already exists
+// 1. create path : new resource got created (GET (-> POST))
+// 2. update path : the default that happens regularly, keeping the resource in sync with the API (GET (->PATCH))
+// 3. delete path : only when resource got deleted (GET (-> DELETE))
+
 func getReadyCondition(status metav1.ConditionStatus, reason, message string) metav1.Condition {
 	return metav1.Condition{
 		Type:    AliasConditionTypeReady,

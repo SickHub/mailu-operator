@@ -50,8 +50,8 @@ var _ = Describe("Domain Controller", func() {
 	}
 
 	BeforeEach(func() {
-		name = "foo"
-		domain = "example.com"
+		name = mockName
+		domain = mockDomain
 		mock = ghttp.NewServer()
 
 		Expect(k8sClient).NotTo(BeNil())
@@ -107,7 +107,7 @@ var _ = Describe("Domain Controller", func() {
 
 		When("updating a Domain", func() {
 			BeforeAll(func() {
-				resAfterReconciliation.Spec.Comment = "some comment"
+				resAfterReconciliation.Spec.Comment = mockComment
 				err := k8sClient.Update(ctx, resAfterReconciliation)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -119,7 +119,7 @@ var _ = Describe("Domain Controller", func() {
 				_, err := reconcile(false)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(resAfterReconciliation.Spec.Comment).To(Equal("some comment"))
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
 			})
 		})
