@@ -104,6 +104,26 @@ var _ = Describe("Alias Controller", func() {
 			})
 		})
 
+		When("creating an Alias that already exists", func() {
+			BeforeAll(func() {
+				res = CreateResource(operatorv1alpha1.Alias{}, "existing", domain).(*operatorv1alpha1.Alias)
+				err := k8sClient.Create(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("finds an existing alias, updates status and adds a finalizer", func() {
+				prepareFindAlias(res, http.StatusOK)
+				preparePatchAlias(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
+			})
+		})
+
 		When("updating an Alias", func() {
 			BeforeAll(func() {
 				resAfterReconciliation.Spec.Comment = "some comment"

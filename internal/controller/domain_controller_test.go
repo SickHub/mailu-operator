@@ -85,6 +85,26 @@ var _ = Describe("Domain Controller", func() {
 			})
 		})
 
+		When("creating a Domain that already exists", func() {
+			BeforeAll(func() {
+				res = CreateResource(operatorv1alpha1.Domain{}, "existing.com", "existing.com").(*operatorv1alpha1.Domain)
+				err := k8sClient.Create(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("finds an existing domain, updates status and adds a finalizer", func() {
+				prepareFindDomain(res, http.StatusOK)
+				preparePatchDomain(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
+			})
+		})
+
 		When("updating a Domain", func() {
 			BeforeAll(func() {
 				resAfterReconciliation.Spec.Comment = "some comment"
