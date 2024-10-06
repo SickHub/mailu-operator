@@ -33,12 +33,14 @@ func CreateResource(obj interface{}, name, domain string) client.Object {
 	case operatorv1alpha1.Alias:
 		return &operatorv1alpha1.Alias{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
-			Spec:       operatorv1alpha1.AliasSpec{Name: name, Domain: domain},
+			Spec: operatorv1alpha1.AliasSpec{
+				Name: name, Domain: domain, Destination: []string{"dest-" + name + "@" + domain},
+			},
 		}
 	case operatorv1alpha1.User:
 		return &operatorv1alpha1.User{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
-			Spec:       operatorv1alpha1.UserSpec{Name: name, Domain: domain, RawPassword: "foo"},
+			Spec:       operatorv1alpha1.UserSpec{Name: name, Domain: domain, RawPassword: name + "-password"},
 		}
 	case operatorv1alpha1.Domain:
 		return &operatorv1alpha1.Domain{
@@ -170,30 +172,33 @@ func prepareDeleteDomain(domain *operatorv1alpha1.Domain, status int) {
 func prepareFindUser(user *operatorv1alpha1.User, status int) {
 	response := getResponse(status)
 	if status == http.StatusOK {
-		response = RespondWithJSONEncoded(http.StatusOK, mailu.User{
-			AllowSpoofing:      &user.Spec.AllowSpoofing,
-			ChangePwNextLogin:  &user.Spec.ChangePassword,
-			Comment:            &user.Spec.Comment,
-			DisplayedName:      &user.Spec.DisplayedName,
-			Email:              user.Spec.Name + "@" + user.Spec.Domain,
-			Enabled:            &user.Spec.Enabled,
-			EnableImap:         &user.Spec.EnableIMAP,
-			EnablePop:          &user.Spec.EnablePOP,
-			ForwardDestination: &user.Spec.ForwardDestination,
-			ForwardEnabled:     &user.Spec.ForwardEnabled,
-			ForwardKeep:        &user.Spec.ForwardKeep,
-			GlobalAdmin:        &user.Spec.GlobalAdmin,
-			Password:           &user.Spec.Name,
-			QuotaBytes:         &user.Spec.QuotaBytes,
-			QuotaBytesUsed:     &user.Spec.QuotaBytes,
-			RawPassword:        &user.Spec.Name,
-			ReplyBody:          &user.Spec.ReplyBody,
-			ReplyEnabled:       &user.Spec.ReplyEnabled,
-			ReplySubject:       &user.Spec.ReplySubject,
-			SpamEnabled:        &user.Spec.SpamEnabled,
-			SpamMarkAsRead:     &user.Spec.SpamMarkAsRead,
-			SpamThreshold:      &user.Spec.SpamThreshold,
-		})
+		newUser := mailu.User{
+			AllowSpoofing:     &user.Spec.AllowSpoofing,
+			ChangePwNextLogin: &user.Spec.ChangePassword,
+			Comment:           &user.Spec.Comment,
+			DisplayedName:     &user.Spec.DisplayedName,
+			Email:             user.Spec.Name + "@" + user.Spec.Domain,
+			Enabled:           &user.Spec.Enabled,
+			EnableImap:        &user.Spec.EnableIMAP,
+			EnablePop:         &user.Spec.EnablePOP,
+			ForwardEnabled:    &user.Spec.ForwardEnabled,
+			ForwardKeep:       &user.Spec.ForwardKeep,
+			GlobalAdmin:       &user.Spec.GlobalAdmin,
+			Password:          &user.Spec.Name,
+			QuotaBytes:        &user.Spec.QuotaBytes,
+			QuotaBytesUsed:    &user.Spec.QuotaBytes,
+			ReplyBody:         &user.Spec.ReplyBody,
+			ReplyEnabled:      &user.Spec.ReplyEnabled,
+			ReplySubject:      &user.Spec.ReplySubject,
+			SpamEnabled:       &user.Spec.SpamEnabled,
+			SpamMarkAsRead:    &user.Spec.SpamMarkAsRead,
+			SpamThreshold:     &user.Spec.SpamThreshold,
+		}
+		// mimick API behaviour
+		if user.Spec.ForwardDestination == nil {
+			newUser.ForwardDestination = &[]string{}
+		}
+		response = RespondWithJSONEncoded(http.StatusOK, newUser)
 	}
 	mock.AppendHandlers(CombineHandlers(
 		VerifyRequest("GET", "/user/"+user.Spec.Name+"@"+user.Spec.Domain),
@@ -202,30 +207,35 @@ func prepareFindUser(user *operatorv1alpha1.User, status int) {
 }
 
 func prepareCreateUser(user *operatorv1alpha1.User, status int) {
+	newUser := mailu.User{
+		Email:              user.Spec.Name + "@" + user.Spec.Domain,
+		AllowSpoofing:      &user.Spec.AllowSpoofing,
+		ChangePwNextLogin:  &user.Spec.ChangePassword,
+		Comment:            &user.Spec.Comment,
+		DisplayedName:      &user.Spec.DisplayedName,
+		EnableImap:         &user.Spec.EnableIMAP,
+		EnablePop:          &user.Spec.EnablePOP,
+		Enabled:            &user.Spec.Enabled,
+		ForwardDestination: &user.Spec.ForwardDestination,
+		ForwardEnabled:     &user.Spec.ForwardEnabled,
+		ForwardKeep:        &user.Spec.ForwardKeep,
+		GlobalAdmin:        &user.Spec.GlobalAdmin,
+		QuotaBytes:         &user.Spec.QuotaBytes,
+		RawPassword:        &user.Spec.RawPassword,
+		ReplyBody:          &user.Spec.ReplyBody,
+		ReplyEnabled:       &user.Spec.ReplyEnabled,
+		ReplySubject:       &user.Spec.ReplySubject,
+		SpamEnabled:        &user.Spec.SpamEnabled,
+		SpamMarkAsRead:     &user.Spec.SpamMarkAsRead,
+		SpamThreshold:      &user.Spec.SpamThreshold,
+	}
+	// mimick API behaviour
+	if user.Spec.ForwardDestination == nil {
+		newUser.ForwardDestination = &[]string{}
+	}
 	mock.AppendHandlers(CombineHandlers(
 		VerifyRequest("POST", "/user"),
-		VerifyJSONRepresenting(mailu.User{
-			Email:              user.Spec.Name + "@" + user.Spec.Domain,
-			AllowSpoofing:      &user.Spec.AllowSpoofing,
-			ChangePwNextLogin:  &user.Spec.ChangePassword,
-			Comment:            &user.Spec.Comment,
-			DisplayedName:      &user.Spec.DisplayedName,
-			EnableImap:         &user.Spec.EnableIMAP,
-			EnablePop:          &user.Spec.EnablePOP,
-			Enabled:            &user.Spec.Enabled,
-			ForwardDestination: &user.Spec.ForwardDestination,
-			ForwardEnabled:     &user.Spec.ForwardEnabled,
-			ForwardKeep:        &user.Spec.ForwardKeep,
-			GlobalAdmin:        &user.Spec.GlobalAdmin,
-			QuotaBytes:         &user.Spec.QuotaBytes,
-			RawPassword:        &user.Spec.RawPassword,
-			ReplyBody:          &user.Spec.ReplyBody,
-			ReplyEnabled:       &user.Spec.ReplyEnabled,
-			ReplySubject:       &user.Spec.ReplySubject,
-			SpamEnabled:        &user.Spec.SpamEnabled,
-			SpamMarkAsRead:     &user.Spec.SpamMarkAsRead,
-			SpamThreshold:      &user.Spec.SpamThreshold,
-		}),
+		VerifyJSONRepresenting(newUser),
 		getResponse(status),
 	))
 }

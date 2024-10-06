@@ -1,19 +1,3 @@
-/*
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
@@ -25,25 +9,24 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
 
-	"github.com/sethvargo/go-password/password"
-
-	"k8s.io/apimachinery/pkg/types"
-
 	openapitypes "github.com/oapi-codegen/runtime/types"
-	"github.com/sickhub/mailu-operator/pkg/mailu"
+	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
+	"github.com/sickhub/mailu-operator/pkg/mailu"
 )
 
 const (
@@ -53,9 +36,10 @@ const (
 // UserReconciler reconciles a User object
 type UserReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	ApiURL   string
-	ApiToken string
+	Scheme    *runtime.Scheme
+	ApiURL    string
+	ApiToken  string
+	ApiClient *mailu.Client
 }
 
 //+kubebuilder:rbac:groups=operator.mailu.io,resources=users,verbs=get;list;watch;create;update;patch;delete
@@ -68,253 +52,320 @@ type UserReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
-func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { //nolint:gocyclo
-	logr := log.FromContext(ctx)
+func (r *UserReconciler) Reconcile(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
+	logr := log.FromContext(ctx, "user", user.Name)
 
-	user := &operatorv1alpha1.User{}
-	err := r.Get(ctx, req.NamespacedName, user)
-	if err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+	userOriginal := user.DeepCopy()
+
+	// apply patches at the end, before returning
+	defer func() {
+		if err := r.Client.Patch(ctx, user.DeepCopy(), client.MergeFrom(userOriginal)); err != nil {
+			logr.Error(err, "failed to patch resource")
+		}
+		if err := r.Client.Status().Patch(ctx, user.DeepCopy(), client.MergeFrom(userOriginal)); err != nil {
+			logr.Error(err, "failed to patch resource status")
+		}
+	}()
+
+	if user.DeletionTimestamp == nil && !controllerutil.ContainsFinalizer(user, FinalizerName) {
+		controllerutil.AddFinalizer(user, FinalizerName)
 	}
 
-	api, err := mailu.NewClient(r.ApiURL, mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-		req.Header.Add("Authorization", "Bearer "+r.ApiToken)
-		return nil
-	}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-		body := make([]byte, 0)
-		if req.Body != nil {
-			body, _ = io.ReadAll(req.Body) //nolint:errcheck
-			req.Body = io.NopCloser(bytes.NewBuffer(body))
-		}
-		logr.Info(fmt.Sprintf("request %s %s: %s", req.Method, req.URL.Path, body))
-		return nil
-	}))
+	result, err := r.reconcile(ctx, user)
 	if err != nil {
+		return result, err
+	}
+
+	if userOriginal.DeletionTimestamp != nil && !result.Requeue {
+		controllerutil.RemoveFinalizer(user, FinalizerName)
+	}
+
+	return result, nil
+}
+
+func (r *UserReconciler) reconcile(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
+	logr := log.FromContext(ctx, "user", user.Name)
+
+	if r.ApiClient == nil {
+		api, err := mailu.NewClient(r.ApiURL, mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+			req.Header.Add("Authorization", "Bearer "+r.ApiToken)
+			return nil
+		}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+			// TODO: make this optional
+			body := make([]byte, 0)
+			if req.Body != nil {
+				body, _ = io.ReadAll(req.Body) //nolint:errcheck
+				req.Body = io.NopCloser(bytes.NewBuffer(body))
+			}
+			logr.Info(fmt.Sprintf("request %s %s: %s", req.Method, req.URL.Path, body))
+			return nil
+		}))
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		r.ApiClient = api
+	}
+
+	foundUser, retry, err := r.getUser(ctx, user)
+	if err != nil {
+		if retry {
+			logr.Info(fmt.Errorf("failed to get user, requeueing: %w", err).Error())
+			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		// we explicitly set the error in the status only on a permanent (non-retryable) error
+		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		logr.Error(err, "failed to get user")
+		return ctrl.Result{}, nil
+	}
+
+	if user.DeletionTimestamp != nil {
+		if foundUser == nil {
+			// no need to delete it, if it does not exist
+			return ctrl.Result{}, nil
+		}
+		return r.delete(ctx, user)
+	}
+
+	if foundUser == nil {
+		return r.create(ctx, user)
+	}
+
+	return r.update(ctx, user, foundUser)
+}
+
+func (r *UserReconciler) create(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
+	logr := log.FromContext(ctx, "user", user.Name)
+	logr.Info("create user")
+
+	retry, err := r.createUser(ctx, user)
+	if err != nil {
+		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		if retry {
+			logr.Info(fmt.Errorf("failed to create user, requeueing: %w", err).Error())
+			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		logr.Error(err, "failed to create user")
 		return ctrl.Result{}, err
 	}
 
+	meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Created", "User created in MailU"))
+
+	return ctrl.Result{Requeue: retry}, nil
+}
+
+func (r *UserReconciler) update(ctx context.Context, user *operatorv1alpha1.User, apiUser *mailu.User) (ctrl.Result, error) {
+	logr := log.FromContext(ctx, "user", user.Name)
+	logr.Info("update user")
+
+	newUser, err := r.userFromSpec(user.Spec)
+	if err != nil {
+		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		logr.Error(err, "failed to get user from spec")
+		return ctrl.Result{}, err
+	}
+
+	// reset some values that should not be updated
+	newUser.RawPassword = nil
+	apiUser.Password = nil
+	apiUser.QuotaBytesUsed = nil
+
+	jsonNew, _ := json.Marshal(newUser) //nolint:errcheck
+	jsonOld, _ := json.Marshal(apiUser) //nolint:errcheck
+
+	if reflect.DeepEqual(jsonNew, jsonOld) {
+		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Updated", "User updated in MailU"))
+		logr.Info("no update needed")
+		return ctrl.Result{}, nil
+	}
+
+	retry, err := r.updateUser(ctx, newUser)
+	if err != nil {
+		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		if retry {
+			logr.Info(fmt.Errorf("failed to update user, requeueing: %w", err).Error())
+			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		logr.Error(err, "failed to update user")
+		return ctrl.Result{}, err
+	}
+
+	meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Updated", "User updated in MailU"))
+
+	return ctrl.Result{Requeue: retry}, nil
+}
+
+func (r *UserReconciler) delete(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
+	logr := log.FromContext(ctx, "user", user.Name)
+	logr.Info("delete user")
+
+	retry, err := r.deleteUser(ctx, user)
+	if err != nil {
+		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		if retry {
+			logr.Info(fmt.Errorf("failed to delete user, requeueing: %w", err).Error())
+			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		logr.Error(err, "failed to delete user")
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{Requeue: retry}, nil
+}
+
+func (r *UserReconciler) getUser(ctx context.Context, user *operatorv1alpha1.User) (*mailu.User, bool, error) {
+	found, err := r.ApiClient.FindUser(ctx, user.Spec.Name+"@"+user.Spec.Domain)
+	if err != nil {
+		return nil, false, err
+	}
+	defer found.Body.Close() //nolint:errcheck
+
+	body, err := io.ReadAll(found.Body)
+	if err != nil {
+		return nil, true, err
+	}
+
+	switch found.StatusCode {
+	case http.StatusOK:
+		foundUser := &mailu.User{}
+		err = json.Unmarshal(body, &foundUser)
+		if err != nil {
+			return nil, true, err
+		}
+
+		return foundUser, false, nil
+	case http.StatusNotFound:
+		return nil, false, nil
+	case http.StatusBadRequest:
+		return nil, false, errors.New("bad request")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return nil, true, errors.New("gateway timeout")
+	case http.StatusServiceUnavailable:
+		return nil, true, errors.New("service unavailable")
+	}
+	return nil, false, errors.New("unknown status: " + strconv.Itoa(found.StatusCode))
+}
+
+func (r *UserReconciler) createUser(ctx context.Context, user *operatorv1alpha1.User) (bool, error) {
+	logr := log.FromContext(ctx, "user", user.Name)
 	email := user.Spec.Name + "@" + user.Spec.Domain
 
-	find, err := api.FindUser(ctx, email)
-	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+	// raw password is required during creation
+	if user.Spec.RawPassword == "" {
+		var err error
+		if user.Spec.PasswordSecret != "" && user.Spec.PasswordKey != "" {
+			user.Spec.RawPassword, err = r.getUserPassword(ctx, user.Namespace, user.Spec.PasswordSecret, user.Spec.PasswordKey)
+			if err != nil {
+				logr.Error(err, fmt.Sprintf("failed to get password from secret %s/%s", user.Namespace, user.Spec.PasswordSecret))
+				return true, err
+			}
+			logr.Info(fmt.Sprintf("using password from secret for user %s", email))
+		} else {
+			// initial random password if none given
+			user.Spec.RawPassword, err = password.Generate(20, 2, 2, false, false)
+			if err != nil {
+				logr.Error(err, fmt.Sprintf("failed to generate password for user %s", email))
+				return true, err
+			}
+			logr.Info(fmt.Sprintf("using generated password for user %s", email))
+		}
 	}
-	defer find.Body.Close() //nolint:errcheck
 
-	// handle generic errors
-	switch find.StatusCode {
-	case http.StatusForbidden:
-		return ctrl.Result{}, errors.New("invalid authorization")
+	newUser, err := r.userFromSpec(user.Spec)
+	if err != nil {
+		return false, err
+	}
 
-	case http.StatusUnauthorized:
-		return ctrl.Result{}, errors.New("missing authorization")
+	res, err := r.ApiClient.CreateUser(ctx, newUser)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close() //nolint:errcheck
 
-	case http.StatusBadRequest:
-		return ctrl.Result{}, errors.New("bad request")
-
+	_, err = io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	switch res.StatusCode {
+	case http.StatusCreated:
+		fallthrough
+	case http.StatusOK:
+		return false, nil
+	case http.StatusConflict:
+		// treat conflict as success -> requeue will trigger an update
+		return true, nil
+	case http.StatusInternalServerError:
+		return false, errors.New("internal server error")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return true, errors.New("gateway timeout")
 	case http.StatusServiceUnavailable:
-		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Minute}, nil
+		return true, errors.New("service unavailable")
 	}
 
-	if user.ObjectMeta.DeletionTimestamp.IsZero() {
-		// Add a finalizer if not present
-		if !controllerutil.ContainsFinalizer(user, FinalizerName) {
-			user.ObjectMeta.Finalizers = append(user.ObjectMeta.Finalizers, FinalizerName)
-			if err := r.Update(ctx, user); err != nil {
-				//log.Error(err, "unable to update Tenant")
-				return ctrl.Result{Requeue: true}, err
-			}
-		}
-
-		var response *http.Response
-		switch find.StatusCode {
-		case http.StatusNotFound:
-			// RawPassword is required during creation
-			if user.Spec.RawPassword == "" {
-				if user.Spec.PasswordSecret != "" && user.Spec.PasswordKey != "" {
-					user.Spec.RawPassword, err = r.getUserPassword(ctx, req.Namespace, user.Spec.PasswordSecret, user.Spec.PasswordKey)
-					if err != nil {
-						logr.Error(err, fmt.Sprintf("failed to get password from secret %s/%s", req.Namespace, user.Spec.PasswordSecret))
-						return ctrl.Result{Requeue: true}, err
-					}
-					logr.Info(fmt.Sprintf("using password from secret for user %s", email))
-				} else {
-					// initial random password if none given
-					user.Spec.RawPassword, err = password.Generate(20, 2, 2, false, false)
-					if err != nil {
-						logr.Error(err, fmt.Sprintf("failed to generate password for user %s", email))
-						return ctrl.Result{Requeue: true}, err
-					}
-					logr.Info(fmt.Sprintf("using generated password for user %s", email))
-				}
-			}
-
-			newUser, err := r.userFromSpec(user.Spec)
-			if err != nil {
-				logr.Error(err, fmt.Sprintf("failed create user from spec, invalid date: %s or %s", user.Spec.ReplyStartDate, user.Spec.ReplyEndDate))
-				return ctrl.Result{}, err
-			}
-
-			response, err = api.CreateUser(ctx, newUser)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			defer response.Body.Close() //nolint:errcheck
-
-			body, err := io.ReadAll(response.Body)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-
-			switch response.StatusCode {
-			case http.StatusBadRequest:
-				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: UserConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Created", Message: "User creation failed: " + string(body)})
-				err = r.Status().Update(ctx, user)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to create user: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
-			case http.StatusConflict:
-				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: UserConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Created", Message: "User creation failed: " + string(body)})
-				err = r.Status().Update(ctx, user)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to create user: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
-			case http.StatusOK:
-				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: UserConditionTypeReady, Status: metav1.ConditionTrue, Reason: "Created", Message: "User created"})
-				err = r.Status().Update(ctx, user)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Info(fmt.Sprintf("user %s created", email))
-				return ctrl.Result{}, nil
-			default:
-				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: UserConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Created", Message: "User creation failed: " + string(body)})
-				err = r.Status().Update(ctx, user)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to create user: %d %s", response.StatusCode, body)
-			}
-
-		case http.StatusOK:
-			body, err := io.ReadAll(find.Body)
-			if err != nil {
-				return ctrl.Result{Requeue: true}, err
-			}
-
-			foundUser := mailu.User{}
-			err = json.Unmarshal(body, &foundUser)
-			if err != nil {
-				return ctrl.Result{Requeue: true}, err
-			}
-
-			newUser, err := r.userFromSpec(user.Spec)
-			if err != nil {
-				return ctrl.Result{Requeue: true}, err
-			}
-
-			// reset some values that don't exist in new user or should not be updated
-			newUser.RawPassword = nil
-			foundUser.Password = nil
-			foundUser.QuotaBytesUsed = nil
-
-			// ignore Dates if not set
-			if newUser.ReplyStartDate == nil {
-				foundUser.ReplyStartDate = nil
-			}
-			if newUser.ReplyEndDate == nil {
-				foundUser.ReplyEndDate = nil
-			}
-
-			// no change
-			if reflect.DeepEqual(foundUser, newUser) {
-				return ctrl.Result{}, nil
-			}
-
-			response, err = api.UpdateUser(ctx, email, newUser)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			defer response.Body.Close() //nolint:errcheck
-
-			body, err = io.ReadAll(response.Body)
-			if err != nil {
-				return ctrl.Result{Requeue: true}, err
-			}
-
-			switch response.StatusCode {
-			case http.StatusBadRequest:
-				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: UserConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Updated", Message: "User update failed: " + string(body)})
-				err = r.Status().Update(ctx, user)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to update user: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
-			case http.StatusOK:
-				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: UserConditionTypeReady, Status: metav1.ConditionTrue, Reason: "Updated", Message: "User updated"})
-				err = r.Status().Update(ctx, user)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Info(fmt.Sprintf("user %s updated", email))
-				return ctrl.Result{}, nil
-			default:
-				meta.SetStatusCondition(&user.Status.Conditions, metav1.Condition{Type: UserConditionTypeReady, Status: metav1.ConditionFalse, Reason: "Updated", Message: "User update failed: " + string(body)})
-				err = r.Status().Update(ctx, user)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update user: %d %s", response.StatusCode, body)
-			}
-
-		default:
-			err = errors.New("unexpected status code")
-			logr.Error(err, fmt.Sprintf("unexpected status code: %d", find.StatusCode))
-			return ctrl.Result{}, err
-		}
-	}
-
-	if controllerutil.ContainsFinalizer(user, FinalizerName) {
-		// Domain removed -> delete
-		if find.StatusCode != http.StatusNotFound {
-			res, err := api.DeleteUser(ctx, user.Spec.Name+"@"+user.Spec.Domain)
-			if err != nil {
-				return ctrl.Result{Requeue: true}, err
-			}
-			if res.StatusCode != http.StatusOK {
-				return ctrl.Result{Requeue: true}, nil
-			}
-		}
-
-		controllerutil.RemoveFinalizer(user, FinalizerName)
-		if err := r.Update(ctx, user); err != nil {
-			return ctrl.Result{}, err
-		}
-		logr.Info(fmt.Sprintf("user %s deleted", email))
-	}
-
-	return ctrl.Result{}, nil
+	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&operatorv1alpha1.User{}).
-		Complete(r)
-}
-
-func (r *UserReconciler) getUserPassword(ctx context.Context, namespace, secret, key string) (string, error) {
-	s := &corev1.Secret{}
-	err := r.Get(ctx, types.NamespacedName{Name: secret, Namespace: namespace}, s)
+func (r *UserReconciler) updateUser(ctx context.Context, newUser mailu.User) (bool, error) {
+	res, err := r.ApiClient.UpdateUser(ctx, newUser.Email, newUser)
 	if err != nil {
-		return "", err
+		return false, err
 	}
-	return string(s.Data[key]), nil
+	defer res.Body.Close() //nolint:errcheck
+
+	_, err = io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	switch res.StatusCode {
+	case http.StatusNoContent:
+		fallthrough
+	case http.StatusOK:
+		return false, nil
+	case http.StatusInternalServerError:
+		return false, errors.New("internal server error")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return true, errors.New("gateway timeout")
+	case http.StatusServiceUnavailable:
+		return true, errors.New("service unavailable")
+	}
+
+	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
+}
+
+func (r *UserReconciler) deleteUser(ctx context.Context, user *operatorv1alpha1.User) (bool, error) {
+	res, err := r.ApiClient.DeleteUser(ctx, user.Spec.Name+"@"+user.Spec.Domain)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close() //nolint:errcheck
+
+	_, err = io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	switch res.StatusCode {
+	case http.StatusNotFound:
+		fallthrough
+	case http.StatusOK:
+		return false, nil
+	case http.StatusInternalServerError:
+		return false, errors.New("internal server error")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return true, errors.New("gateway timeout")
+	case http.StatusServiceUnavailable:
+		return true, errors.New("service unavailable")
+	}
+
+	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
 }
 
 func (r *UserReconciler) userFromSpec(spec operatorv1alpha1.UserSpec) (mailu.User, error) {
@@ -341,6 +392,11 @@ func (r *UserReconciler) userFromSpec(spec operatorv1alpha1.UserSpec) (mailu.Use
 		SpamThreshold:      &spec.SpamThreshold,
 	}
 
+	// mimick API behaviour
+	if spec.ForwardDestination == nil {
+		u.ForwardDestination = &[]string{}
+	}
+
 	// convert Dates if set
 	if spec.ReplyStartDate != "" {
 		d := &openapitypes.Date{}
@@ -360,4 +416,29 @@ func (r *UserReconciler) userFromSpec(spec operatorv1alpha1.UserSpec) (mailu.Use
 	}
 
 	return u, nil
+}
+
+func (r *UserReconciler) getUserPassword(ctx context.Context, namespace, secret, key string) (string, error) {
+	s := &corev1.Secret{}
+	err := r.Get(ctx, types.NamespacedName{Name: secret, Namespace: namespace}, s)
+	if err != nil {
+		return "", err
+	}
+	return string(s.Data[key]), nil
+}
+
+func getUserReadyCondition(status metav1.ConditionStatus, reason, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:    UserConditionTypeReady,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	}
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&operatorv1alpha1.User{}).
+		Complete(reconcile.AsReconciler(r.Client, r))
 }
