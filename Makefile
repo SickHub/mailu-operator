@@ -52,7 +52,7 @@ OPERATOR_SDK_VERSION ?= v1.36.1 # github-releases:operator-framework/operator-sd
 # Image URL to use all building/pushing image targets
 IMG ?= drpsychick/mailu-operator:$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.29.0 # github-releases:kubernetes/kubernetes
+ENVTEST_K8S_VERSION = 1.31.0 # github-releases:kubernetes/kubernetes
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -211,7 +211,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.3.0 # github-releases:kubernetes-sigs/kustomize
 CONTROLLER_TOOLS_VERSION ?= v0.16.3 # github-releases:kubernetes-sigs/controller-tools
-ENVTEST_VERSION ?= release-0.17 # github-releases:kubernetes-sigs/controller-runtime
+ENVTEST_VERSION ?= release-0.19 # github-releases:kubernetes-sigs/controller-runtime
 GOLANGCI_LINT_VERSION ?= v1.61.0 # github-releases:golangci/golangci-lint
 
 .PHONY: kustomize
