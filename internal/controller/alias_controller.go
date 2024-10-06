@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -48,7 +47,7 @@ type AliasReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
 func (r *AliasReconciler) Reconcile(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "alias", alias.Name)
+	logr := log.FromContext(ctx, "namespace", alias.Namespace, "alias", alias.Name)
 
 	aliasOriginal := alias.DeepCopy()
 
@@ -79,20 +78,11 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, alias *operatorv1alpha1
 }
 
 func (r *AliasReconciler) reconcile(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "alias", alias.Name)
+	logr := log.FromContext(ctx, "namespace", alias.Namespace, "alias", alias.Name)
 
 	if r.ApiClient == nil {
 		api, err := mailu.NewClient(r.ApiURL, mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
 			req.Header.Add("Authorization", "Bearer "+r.ApiToken)
-			return nil
-		}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-			// TODO: make this optional
-			body := make([]byte, 0)
-			if req.Body != nil {
-				body, _ = io.ReadAll(req.Body) //nolint:errcheck
-				req.Body = io.NopCloser(bytes.NewBuffer(body))
-			}
-			logr.Info(fmt.Sprintf("request %s %s: %s", req.Method, req.URL.Path, body))
 			return nil
 		}))
 		if err != nil {
@@ -129,8 +119,7 @@ func (r *AliasReconciler) reconcile(ctx context.Context, alias *operatorv1alpha1
 }
 
 func (r *AliasReconciler) create(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "alias", alias.Name)
-	logr.Info("create alias")
+	logr := log.FromContext(ctx, "namespace", alias.Namespace, "alias", alias.Name)
 
 	retry, err := r.createAlias(ctx, alias)
 	if err != nil {
@@ -143,14 +132,16 @@ func (r *AliasReconciler) create(ctx context.Context, alias *operatorv1alpha1.Al
 		return ctrl.Result{}, err
 	}
 
-	meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Created", "Alias created in MailU"))
+	if !retry {
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Created", "Alias created in MailU"))
+		logr.Info("created alias")
+	}
 
 	return ctrl.Result{Requeue: retry}, nil
 }
 
 func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Alias, apiAlias *mailu.Alias) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "alias", alias.Name)
-	logr.Info("update alias")
+	logr := log.FromContext(ctx, "namespace", alias.Namespace, "alias", alias.Name)
 
 	newAlias := mailu.Alias{
 		Email:    alias.Spec.Name + "@" + alias.Spec.Domain,
@@ -166,7 +157,6 @@ func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Al
 
 	if reflect.DeepEqual(jsonNew, jsonOld) {
 		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
-		logr.Info("no update needed")
 		return ctrl.Result{}, nil
 	}
 
@@ -181,14 +171,16 @@ func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Al
 		return ctrl.Result{}, err
 	}
 
-	meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
+	if !retry {
+		logr.Info("updated alias")
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
+	}
 
 	return ctrl.Result{Requeue: retry}, nil
 }
 
 func (r *AliasReconciler) delete(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "alias", alias.Name)
-	logr.Info("delete alias")
+	logr := log.FromContext(ctx, "namespace", alias.Namespace, "alias", alias.Name)
 
 	retry, err := r.deleteAlias(ctx, alias)
 	if err != nil {
@@ -199,6 +191,10 @@ func (r *AliasReconciler) delete(ctx context.Context, alias *operatorv1alpha1.Al
 		}
 		logr.Error(err, "failed to delete alias")
 		return ctrl.Result{}, err
+	}
+
+	if !retry {
+		logr.Info("deleted alias")
 	}
 
 	return ctrl.Result{Requeue: retry}, nil
