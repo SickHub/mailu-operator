@@ -40,20 +40,27 @@ spec:
             description: DomainSpec defines the desired state of Domain
             properties:
               alternatives:
+                description: Alternatives contains alternative domain names.
                 items:
                   type: string
                 type: array
               comment:
+                description: Comment is a custom comment for the domain.
                 type: string
               maxAliases:
+                description: MaxAliases, -1 for unlimited.
                 type: integer
               maxQuotaBytes:
+                description: MaxQuotaBytes, -1 for unlimited.
                 type: integer
               maxUsers:
+                description: MaxUsers, -1 for unlimited.
                 type: integer
               name:
+                description: Domain name.
                 type: string
               signupEnabled:
+                description: SignupEnabled allows users to self-signup for this domain.
                 type: boolean
             required:
             - name

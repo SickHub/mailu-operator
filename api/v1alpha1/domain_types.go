@@ -23,18 +23,19 @@ import (
 // DomainSpec defines the desired state of Domain
 type DomainSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Domain name.
 	Name string `json:"name"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Comment is a custom comment for the domain.
 	Comment string `json:"comment,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// MaxUsers, -1 for unlimited.
 	MaxUsers int `json:"maxUsers,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// MaxAliases, -1 for unlimited.
 	MaxAliases int `json:"maxAliases,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// MaxQuotaBytes, -1 for unlimited.
 	MaxQuotaBytes int `json:"maxQuotaBytes,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// SignupEnabled allows users to self-signup for this domain.
 	SignupEnabled bool `json:"signupEnabled,omitempty"`
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Alternatives contains alternative domain names.
 	Alternatives []string `json:"alternatives,omitempty"`
 }
 

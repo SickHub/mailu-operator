@@ -40,16 +40,23 @@ spec:
             description: AliasSpec defines the desired state of Alias
             properties:
               comment:
+                description: Comment is a custom comment for the alias.
                 type: string
               destination:
+                description: Destination is a list of destinations for e-mails to
+                  'name@domain'.
                 items:
                   type: string
                 type: array
               domain:
+                description: Domain part of e-mail address 'name@domain'.
                 type: string
               name:
+                description: Name part of e-mail address 'name@domain'.
                 type: string
               wildcard:
+                description: Wildcard must be set to 'true' if the name contains the
+                  wildcard character '%'.
                 type: boolean
             required:
             - domain

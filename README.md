@@ -82,11 +82,11 @@ flowchart LR
   Controller
   MailuAPI(Mailu API)
   
-  User -- 1. create/update/delete Domain resource --> CRD
+  User -- 1 create/update/delete Domain resource --> CRD
   
-  Controller -- 2. watch Domain resources --> CRD
-  Controller -- 3. get/create/update/delete Domain --> MailuAPI
-  Controller -- 4. update resource status --> CRD
+  Controller -- 2 watch Domain resources --> CRD
+  Controller -- 3 get/create/update/delete Domain --> MailuAPI
+  Controller -- 4 update resource status --> CRD
 ```
 
 ### How to use the resources

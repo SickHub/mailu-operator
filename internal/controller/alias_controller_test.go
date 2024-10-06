@@ -1,100 +1,272 @@
-/*
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package controller
+package controller_test
 
 import (
 	"context"
+	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"github.com/onsi/gomega/ghttp"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
+	. "github.com/sickhub/mailu-operator/internal/controller"
 )
 
 var _ = Describe("Alias Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+	var (
+		controllerReconciler   *AliasReconciler
+		res                    *operatorv1alpha1.Alias
+		result                 ctrl.Result
+		resAfterReconciliation *operatorv1alpha1.Alias
+		name                   string
+		domain                 string
+	)
+	ctx := context.Background()
 
-		ctx := context.Background()
+	reconcile := func(deleted bool) (ctrl.Result, error) {
+		Expect(res).NotTo(BeNil())
+		Expect(controllerReconciler).NotTo(BeNil())
 
 		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Name:      res.GetName(),
+			Namespace: res.GetNamespace(),
 		}
-		alias := &operatorv1alpha1.Alias{}
+		var resultErr error
+		result, resultErr = controllerReconciler.Reconcile(ctx, res)
 
-		mailuMock := mailuMock()
+		resAfterReconciliation = &operatorv1alpha1.Alias{}
+		err := k8sClient.Get(ctx, typeNamespacedName, resAfterReconciliation)
+		if !deleted {
+			Expect(err).ToNot(HaveOccurred())
+		}
 
-		BeforeEach(func() {
-			By("creating the custom resource for the Kind Alias")
-			err := k8sClient.Get(ctx, typeNamespacedName, alias)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &operatorv1alpha1.Alias{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					Spec: operatorv1alpha1.AliasSpec{
-						Name:   "foo",
-						Domain: "example.com",
-					},
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-			}
+		return result, resultErr
+	}
+
+	BeforeEach(func() {
+		name = mockName
+		domain = mockDomain
+		mock = ghttp.NewServer()
+
+		Expect(k8sClient).NotTo(BeNil())
+		controllerReconciler = &AliasReconciler{
+			Client: k8sClient,
+			Scheme: k8sClient.Scheme(),
+			ApiURL: mock.URL(),
+			//ApiToken: "asdf",
+		}
+	})
+
+	Context("On an empty cluster", Ordered, func() {
+
+		When("creating an Alias", func() {
+			BeforeAll(func() {
+				res = CreateResource(operatorv1alpha1.Alias{}, name, domain).(*operatorv1alpha1.Alias)
+				err := k8sClient.Create(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("updates the status, if creation fails", func() {
+				prepareFindAlias(res, http.StatusNotFound)
+				prepareCreateAlias(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
+			})
+
+			It("creates the alias, updates status and adds a finalizer", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindAlias(res, http.StatusNotFound)
+				prepareCreateAlias(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
+			})
+
+			It("requeues the request, if a retryable error occurs", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindAlias(res, http.StatusServiceUnavailable)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(result.Requeue).To(BeTrue())
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
+			})
+
+			It("updates status, if a permanent error occurs", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindAlias(res, http.StatusBadRequest)
+
+				_, err := reconcile(false)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(result.Requeue).To(BeFalse())
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
+				condition := meta.FindStatusCondition(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)
+				Expect(condition.Reason).To(Equal("Error"))
+			})
+
+			It("updates the status, if creation fails with conflict", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindAlias(res, http.StatusNotFound)
+				prepareCreateAlias(res, http.StatusConflict)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
+				Expect(result.Requeue).To(BeTrue())
+			})
 		})
 
-		AfterEach(func() {
-			resource := &operatorv1alpha1.Alias{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
+		When("updating an Alias", func() {
+			BeforeAll(func() {
+				res = resAfterReconciliation.DeepCopy()
+				res.Spec.Comment = mockComment
+				err := k8sClient.Update(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
 
-			By("Cleanup the specific resource instance Alias")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("updates the alias", func() {
+				prepareFindAlias(resAfterReconciliation, http.StatusOK)
+				preparePatchAlias(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
+			})
+
+			It("does nothing, if there is no change", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindAlias(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
+			})
+
+			It("requeues the request, if a retryable error occurs", func() {
+				res = resAfterReconciliation.DeepCopy()
+				res.Spec.Comment = mockComment + "1"
+				err := k8sClient.Update(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				prepareFindAlias(resAfterReconciliation, http.StatusOK)
+				preparePatchAlias(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment + "1"))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
+			})
 		})
 
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &AliasReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				ApiURL:   mailuMock,
-				ApiToken: "asdf",
-			}
+		When("deleting an Alias", func() {
+			BeforeAll(func() {
+				res = resAfterReconciliation.DeepCopy()
+				err := k8sClient.Delete(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
 			})
-			Expect(err).NotTo(HaveOccurred())
 
-			// reconcile again to cover "update" path
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+			It("requeues the request, if a retryable error occurs", func() {
+				prepareFindAlias(res, http.StatusOK)
+				prepareDeleteAlias(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
 			})
-			Expect(err).NotTo(HaveOccurred())
 
-			alias := &operatorv1alpha1.Alias{}
-			err = k8sClient.Get(ctx, typeNamespacedName, alias)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(alias.Status.Conditions).ToNot(BeEmpty())
+			It("deletes the alias", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindAlias(res, http.StatusOK)
+				prepareDeleteAlias(res, http.StatusOK)
+
+				_, err := reconcile(true)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation).To(BeComparableTo(&operatorv1alpha1.Alias{}))
+			})
+		})
+
+		// Info: this must be after deleting the resource, because we're creating it again.
+		When("creating an Alias that already exists", func() {
+			BeforeAll(func() {
+				res = CreateResource(operatorv1alpha1.Alias{}, name, domain).(*operatorv1alpha1.Alias)
+				err := k8sClient.Create(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("finds an existing alias, updates status and adds a finalizer", func() {
+				Expect(res.GetFinalizers()).To(HaveLen(0))
+				Expect(res.Status.Conditions).To(HaveLen(0))
+
+				prepareFindAlias(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
+			})
+		})
+
+		When("deleting an Alias that does not exist", func() {
+			BeforeAll(func() {
+				res = resAfterReconciliation.DeepCopy()
+				err := k8sClient.Delete(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("does not delete the alias", func() {
+				prepareFindAlias(res, http.StatusNotFound)
+
+				_, err := reconcile(true)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation).To(BeComparableTo(&operatorv1alpha1.Alias{}))
+			})
 		})
 	})
 })

@@ -1,19 +1,3 @@
-/*
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
@@ -25,27 +9,33 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
 
-	"github.com/sickhub/mailu-operator/pkg/mailu"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
+	"github.com/sickhub/mailu-operator/pkg/mailu"
+)
+
+const (
+	AliasConditionTypeReady = "AliasReady"
 )
 
 // AliasReconciler reconciles a Alias object
 type AliasReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	ApiURL   string
-	ApiToken string
+	Scheme    *runtime.Scheme
+	ApiURL    string
+	ApiToken  string
+	ApiClient *mailu.Client
 }
 
 //+kubebuilder:rbac:groups=operator.mailu.io,resources=aliases,verbs=get;list;watch;create;update;patch;delete
@@ -57,228 +47,307 @@ type AliasReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
-func (r *AliasReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { //nolint:gocyclo
-	logr := log.FromContext(ctx)
+func (r *AliasReconciler) Reconcile(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
+	logr := log.FromContext(ctx, "alias", alias.Name)
 
-	alias := &operatorv1alpha1.Alias{}
-	err := r.Get(ctx, req.NamespacedName, alias)
-	if err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+	aliasOriginal := alias.DeepCopy()
+
+	// apply patches at the end, before returning
+	defer func() {
+		if err := r.Client.Patch(ctx, alias.DeepCopy(), client.MergeFrom(aliasOriginal)); err != nil {
+			logr.Error(err, "failed to patch resource")
+		}
+		if err := r.Client.Status().Patch(ctx, alias.DeepCopy(), client.MergeFrom(aliasOriginal)); err != nil {
+			logr.Error(err, "failed to patch resource status")
+		}
+	}()
+
+	if alias.DeletionTimestamp == nil && !controllerutil.ContainsFinalizer(alias, FinalizerName) {
+		controllerutil.AddFinalizer(alias, FinalizerName)
 	}
 
-	api, err := mailu.NewClient(r.ApiURL, mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-		req.Header.Add("Authorization", "Bearer "+r.ApiToken)
-		return nil
-	}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-		body := []byte{}
-		if req.Body != nil {
-			body, _ = io.ReadAll(req.Body) //nolint:errcheck
-			req.Body = io.NopCloser(bytes.NewBuffer(body))
-		}
-		logr.Info(fmt.Sprintf("request %s %s: %s", req.Method, req.URL.Path, body))
-		return nil
-	}))
+	result, err := r.reconcile(ctx, alias)
 	if err != nil {
+		return result, err
+	}
+
+	if aliasOriginal.DeletionTimestamp != nil && !result.Requeue {
+		controllerutil.RemoveFinalizer(alias, FinalizerName)
+	}
+
+	return result, nil
+}
+
+func (r *AliasReconciler) reconcile(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
+	logr := log.FromContext(ctx, "alias", alias.Name)
+
+	if r.ApiClient == nil {
+		api, err := mailu.NewClient(r.ApiURL, mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+			req.Header.Add("Authorization", "Bearer "+r.ApiToken)
+			return nil
+		}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+			// TODO: make this optional
+			body := make([]byte, 0)
+			if req.Body != nil {
+				body, _ = io.ReadAll(req.Body) //nolint:errcheck
+				req.Body = io.NopCloser(bytes.NewBuffer(body))
+			}
+			logr.Info(fmt.Sprintf("request %s %s: %s", req.Method, req.URL.Path, body))
+			return nil
+		}))
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		r.ApiClient = api
+	}
+
+	foundAlias, retry, err := r.getAlias(ctx, alias)
+	if err != nil {
+		if retry {
+			logr.Info(fmt.Errorf("failed to get alias, requeueing: %w", err).Error())
+			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		// we explicitly set the error in the status only on a permanent (non-retryable) error
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		logr.Error(err, "failed to get alias")
+		return ctrl.Result{}, nil
+	}
+
+	if alias.DeletionTimestamp != nil {
+		if foundAlias == nil {
+			// no need to delete it, if it does not exist
+			return ctrl.Result{}, nil
+		}
+		return r.delete(ctx, alias)
+	}
+
+	if foundAlias == nil {
+		return r.create(ctx, alias)
+	}
+
+	return r.update(ctx, alias, foundAlias)
+}
+
+func (r *AliasReconciler) create(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
+	logr := log.FromContext(ctx, "alias", alias.Name)
+	logr.Info("create alias")
+
+	retry, err := r.createAlias(ctx, alias)
+	if err != nil {
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		if retry {
+			logr.Info(fmt.Errorf("failed to create alias, requeueing: %w", err).Error())
+			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		logr.Error(err, "failed to create alias")
 		return ctrl.Result{}, err
 	}
 
-	email := alias.Spec.Name + "@" + alias.Spec.Domain
+	meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Created", "Alias created in MailU"))
 
-	find, err := api.FindAlias(ctx, email)
+	return ctrl.Result{Requeue: retry}, nil
+}
+
+func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Alias, apiAlias *mailu.Alias) (ctrl.Result, error) {
+	logr := log.FromContext(ctx, "alias", alias.Name)
+	logr.Info("update alias")
+
+	newAlias := mailu.Alias{
+		Email:    alias.Spec.Name + "@" + alias.Spec.Domain,
+		Comment:  &alias.Spec.Comment,
+		Wildcard: &alias.Spec.Wildcard,
+	}
+	if alias.Spec.Destination != nil {
+		newAlias.Destination = &alias.Spec.Destination
+	}
+
+	jsonNew, _ := json.Marshal(newAlias) //nolint:errcheck
+	jsonOld, _ := json.Marshal(apiAlias) //nolint:errcheck
+
+	if reflect.DeepEqual(jsonNew, jsonOld) {
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
+		logr.Info("no update needed")
+		return ctrl.Result{}, nil
+	}
+
+	retry, err := r.updateAlias(ctx, newAlias)
 	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		if retry {
+			logr.Info(fmt.Errorf("failed to update alias, requeueing: %w", err).Error())
+			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		logr.Error(err, "failed to update alias")
+		return ctrl.Result{}, err
 	}
-	defer find.Body.Close() //nolint:errcheck
 
-	// handle generic errors
-	switch find.StatusCode {
-	case http.StatusForbidden:
-		return ctrl.Result{}, errors.New("invalid authorization")
+	meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
 
-	case http.StatusUnauthorized:
-		return ctrl.Result{}, errors.New("missing authorization")
+	return ctrl.Result{Requeue: retry}, nil
+}
 
+func (r *AliasReconciler) delete(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
+	logr := log.FromContext(ctx, "alias", alias.Name)
+	logr.Info("delete alias")
+
+	retry, err := r.deleteAlias(ctx, alias)
+	if err != nil {
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		if retry {
+			logr.Info(fmt.Errorf("failed to delete alias, requeueing: %w", err).Error())
+			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		logr.Error(err, "failed to delete alias")
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{Requeue: retry}, nil
+}
+
+func (r *AliasReconciler) getAlias(ctx context.Context, alias *operatorv1alpha1.Alias) (*mailu.Alias, bool, error) {
+	found, err := r.ApiClient.FindAlias(ctx, alias.Spec.Name+"@"+alias.Spec.Domain)
+	if err != nil {
+		return nil, false, err
+	}
+	defer found.Body.Close() //nolint:errcheck
+
+	body, err := io.ReadAll(found.Body)
+	if err != nil {
+		return nil, true, err
+	}
+
+	switch found.StatusCode {
+	case http.StatusOK:
+		foundAlias := &mailu.Alias{}
+		err = json.Unmarshal(body, &foundAlias)
+		if err != nil {
+			return nil, true, err
+		}
+
+		return foundAlias, false, nil
+	case http.StatusNotFound:
+		return nil, false, nil
 	case http.StatusBadRequest:
-		return ctrl.Result{}, errors.New("bad request")
-
+		return nil, false, errors.New("bad request")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return nil, true, errors.New("gateway timeout")
 	case http.StatusServiceUnavailable:
-		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Minute}, nil
+		return nil, true, errors.New("service unavailable")
+	}
+	return nil, false, errors.New("unknown status: " + strconv.Itoa(found.StatusCode))
+}
+
+func (r *AliasReconciler) createAlias(ctx context.Context, alias *operatorv1alpha1.Alias) (bool, error) {
+	res, err := r.ApiClient.CreateAlias(ctx, mailu.Alias{
+		Email:       alias.Spec.Name + "@" + alias.Spec.Domain,
+		Comment:     &alias.Spec.Comment,
+		Destination: &alias.Spec.Destination,
+		Wildcard:    &alias.Spec.Wildcard,
+	})
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close() //nolint:errcheck
+
+	_, err = io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	switch res.StatusCode {
+	case http.StatusCreated:
+		fallthrough
+	case http.StatusOK:
+		return false, nil
+	case http.StatusConflict:
+		// treat conflict as success -> requeue will trigger an update
+		return true, nil
+	case http.StatusInternalServerError:
+		return false, errors.New("internal server error")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return true, errors.New("gateway timeout")
+	case http.StatusServiceUnavailable:
+		return true, errors.New("service unavailable")
 	}
 
-	if alias.ObjectMeta.DeletionTimestamp.IsZero() {
-		// Add a finalizer if not present
-		if !controllerutil.ContainsFinalizer(alias, finalizerName) {
-			alias.ObjectMeta.Finalizers = append(alias.ObjectMeta.Finalizers, finalizerName)
-			if err := r.Update(ctx, alias); err != nil {
-				//log.Error(err, "unable to update Tenant")
-				return ctrl.Result{Requeue: true}, err
-			}
-		}
+	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
+}
 
-		// not deleted -> ensure the domain exists
-		var response *http.Response
-		switch find.StatusCode {
-		case http.StatusNotFound:
-			response, err = api.CreateAlias(ctx, mailu.Alias{
-				Email:       email,
-				Comment:     &alias.Spec.Comment,
-				Destination: &alias.Spec.Destination,
-				Wildcard:    &alias.Spec.Wildcard,
-			})
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			defer response.Body.Close() //nolint:errcheck
+func (r *AliasReconciler) updateAlias(ctx context.Context, newAlias mailu.Alias) (bool, error) {
+	res, err := r.ApiClient.UpdateAlias(ctx, newAlias.Email, newAlias)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close() //nolint:errcheck
 
-			body, err := io.ReadAll(response.Body)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-
-			switch response.StatusCode {
-			case http.StatusBadRequest:
-				// TODO: define consistent conditions/types that make sense (Created, Updated, Deleted?) https://maelvls.dev/kubernetes-conditions/
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Alias creation failed: " + string(body)})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to create alias: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
-			case http.StatusConflict:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Alias creation failed: " + string(body)})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to create alias: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
-			case http.StatusNotFound:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Alias creation failed: " + string(body)})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to create alias: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
-			case http.StatusOK:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Created", Message: "Alias created"})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Info(fmt.Sprintf("alias %s created", email))
-				return ctrl.Result{}, nil
-			default:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionFalse, Reason: "Created", Message: "Alias creation failed: " + string(body)})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to create alias: %d %s", response.StatusCode, body)
-			}
-
-		case http.StatusOK:
-			body, err := io.ReadAll(find.Body)
-			if err != nil {
-				return ctrl.Result{Requeue: true}, err
-			}
-
-			foundAlias := mailu.Alias{}
-			err = json.Unmarshal(body, &foundAlias)
-			if err != nil {
-				return ctrl.Result{Requeue: true}, err
-			}
-
-			ali := mailu.Alias{
-				Email:       email,
-				Comment:     &alias.Spec.Comment,
-				Destination: &alias.Spec.Destination,
-				Wildcard:    &alias.Spec.Wildcard,
-			}
-
-			// no change
-			if reflect.DeepEqual(foundAlias, ali) {
-				return ctrl.Result{}, nil
-			}
-
-			response, err = api.UpdateAlias(ctx, email, ali)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			defer response.Body.Close() //nolint:errcheck
-
-			body, err = io.ReadAll(response.Body)
-			if err != nil {
-				return ctrl.Result{Requeue: true}, err
-			}
-
-			switch response.StatusCode {
-			case http.StatusBadRequest:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Alias update failed: " + string(body)})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to create alias: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
-			case http.StatusConflict:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Alias update failed: " + string(body)})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Error(err, fmt.Sprintf("failed to create alias: %d %s", response.StatusCode, body))
-				return ctrl.Result{Requeue: false}, nil
-			case http.StatusOK:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Alias updated"})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				logr.Info(fmt.Sprintf("alias %s updated", email))
-				return ctrl.Result{}, nil
-			default:
-				meta.SetStatusCondition(&alias.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "Updated", Message: "Alias update failed: " + string(body)})
-				err = r.Status().Update(ctx, alias)
-				if err != nil {
-					return ctrl.Result{Requeue: true}, err
-				}
-				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update alias: %d %s", response.StatusCode, body)
-			}
-
-		default:
-			err = errors.New("unexpected status code")
-			logr.Error(err, fmt.Sprintf("unexpected status code: %d", find.StatusCode))
-			return ctrl.Result{}, err
-		}
+	_, err = io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
 	}
 
-	if controllerutil.ContainsFinalizer(alias, finalizerName) {
-		// Domain removed -> delete
-		if find.StatusCode != http.StatusNotFound {
-			res, err := api.DeleteAlias(ctx, email)
-			if err != nil {
-				return ctrl.Result{Requeue: true}, err
-			}
-			if res.StatusCode != http.StatusOK {
-				return ctrl.Result{Requeue: true}, nil
-			}
-		}
-
-		controllerutil.RemoveFinalizer(alias, finalizerName)
-		if err := r.Update(ctx, alias); err != nil {
-			return ctrl.Result{}, err
-		}
-		logr.Info(fmt.Sprintf("alias %s deleted", email))
+	switch res.StatusCode {
+	case http.StatusNoContent:
+		fallthrough
+	case http.StatusOK:
+		return false, nil
+	case http.StatusInternalServerError:
+		return false, errors.New("internal server error")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return true, errors.New("gateway timeout")
+	case http.StatusServiceUnavailable:
+		return true, errors.New("service unavailable")
 	}
 
-	return ctrl.Result{}, nil
+	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
+}
+
+func (r *AliasReconciler) deleteAlias(ctx context.Context, alias *operatorv1alpha1.Alias) (bool, error) {
+	res, err := r.ApiClient.DeleteAlias(ctx, alias.Spec.Name+"@"+alias.Spec.Domain)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close() //nolint:errcheck
+
+	_, err = io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	switch res.StatusCode {
+	case http.StatusNotFound:
+		fallthrough
+	case http.StatusOK:
+		return false, nil
+	case http.StatusInternalServerError:
+		return false, errors.New("internal server error")
+	case http.StatusBadGateway:
+		fallthrough
+	case http.StatusGatewayTimeout:
+		return true, errors.New("gateway timeout")
+	case http.StatusServiceUnavailable:
+		return true, errors.New("service unavailable")
+	}
+
+	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
+}
+
+func getAliasReadyCondition(status metav1.ConditionStatus, reason, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:    AliasConditionTypeReady,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AliasReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&operatorv1alpha1.Alias{}).
-		Complete(r)
+		Complete(reconcile.AsReconciler(r.Client, r))
 }

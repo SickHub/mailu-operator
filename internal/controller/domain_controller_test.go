@@ -1,203 +1,272 @@
-/*
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package controller
+package controller_test
 
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
-
-	"github.com/go-chi/chi/v5"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/onsi/gomega/ghttp"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
+	. "github.com/sickhub/mailu-operator/internal/controller"
 )
 
 var _ = Describe("Domain Controller", func() {
-	// TODO: unify context, use multiple "It" : https://onsi.github.io/ginkgo/
-	Context("When reconciling a created resource", func() {
-		const resourceName = "test-resource"
+	var (
+		controllerReconciler   *DomainReconciler
+		res                    *operatorv1alpha1.Domain
+		result                 ctrl.Result
+		resAfterReconciliation *operatorv1alpha1.Domain
+		name                   string
+		domain                 string
+	)
+	ctx := context.Background()
 
-		ctx := context.Background()
+	reconcile := func(deleted bool) (ctrl.Result, error) {
+		Expect(res).NotTo(BeNil())
+		Expect(controllerReconciler).NotTo(BeNil())
 
 		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Name:      res.GetName(),
+			Namespace: res.GetNamespace(),
 		}
-		domain := &operatorv1alpha1.Domain{}
+		var resultErr error
+		result, resultErr = controllerReconciler.Reconcile(ctx, res)
 
-		mailuMock := mailuMock()
+		resAfterReconciliation = &operatorv1alpha1.Domain{}
+		err := k8sClient.Get(ctx, typeNamespacedName, resAfterReconciliation)
+		if !deleted {
+			Expect(err).ToNot(HaveOccurred())
+		}
 
-		BeforeEach(func() {
-			By("creating the custom resource for the Kind Domain")
-			err := k8sClient.Get(ctx, typeNamespacedName, domain)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &operatorv1alpha1.Domain{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					Spec: operatorv1alpha1.DomainSpec{
-						Name:          "example.com",
-						Comment:       "example domain",
-						MaxUsers:      -1,
-						MaxAliases:    -1,
-						MaxQuotaBytes: -1,
-						SignupEnabled: false,
-						Alternatives:  []string{"foo.example.com"},
-					},
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-			}
+		return result, resultErr
+	}
+
+	BeforeEach(func() {
+		name = mockName
+		domain = mockDomain
+		mock = ghttp.NewServer()
+
+		Expect(k8sClient).NotTo(BeNil())
+		controllerReconciler = &DomainReconciler{
+			Client: k8sClient,
+			Scheme: k8sClient.Scheme(),
+			ApiURL: mock.URL(),
+			//ApiToken: "asdf",
+		}
+	})
+
+	Context("On an empty cluster", Ordered, func() {
+
+		When("creating a Domain", func() {
+			BeforeAll(func() {
+				res = CreateResource(operatorv1alpha1.Domain{}, name, domain).(*operatorv1alpha1.Domain)
+				err := k8sClient.Create(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("updates the status, if creation fails", func() {
+				prepareFindDomain(res, http.StatusNotFound)
+				prepareCreateDomain(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
+			})
+
+			It("creates the domain, updates status and adds a finalizer", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusNotFound)
+				prepareCreateDomain(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
+			})
+
+			It("requeues the request, if a retryable error occurs", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusServiceUnavailable)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(result.Requeue).To(BeTrue())
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
+			})
+
+			It("updates status, if a permanent error occurs", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusBadRequest)
+
+				_, err := reconcile(false)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(result.Requeue).To(BeFalse())
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeFalse())
+				condition := meta.FindStatusCondition(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)
+				Expect(condition.Reason).To(Equal("Error"))
+			})
+
+			It("updates the status, if creation fails with conflict", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusNotFound)
+				prepareCreateDomain(res, http.StatusConflict)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
+				Expect(result.Requeue).To(BeTrue())
+			})
 		})
 
-		AfterEach(func() {
-			resource := &operatorv1alpha1.Domain{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			if err == nil {
-				By("Cleanup the specific resource instance Domain")
-				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-			}
+		When("updating a Domain", func() {
+			BeforeAll(func() {
+				res = resAfterReconciliation.DeepCopy()
+				res.Spec.Comment = mockComment
+				err := k8sClient.Update(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("updates the domain", func() {
+				prepareFindDomain(resAfterReconciliation, http.StatusOK)
+				preparePatchDomain(resAfterReconciliation, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
+			})
+
+			It("does nothing, if there is no change", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
+			})
+
+			It("requeues the request, if a retryable error occurs", func() {
+				res = resAfterReconciliation.DeepCopy()
+				res.Spec.Comment = mockComment + "1"
+				err := k8sClient.Update(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				prepareFindDomain(resAfterReconciliation, http.StatusOK)
+				preparePatchDomain(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment + "1"))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
+			})
 		})
 
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &DomainReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				ApiURL:   mailuMock,
-				ApiToken: "asdf",
-			}
+		When("deleting a Domain", func() {
+			BeforeAll(func() {
+				res = resAfterReconciliation.DeepCopy()
+				err := k8sClient.Delete(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
 			})
-			Expect(err).NotTo(HaveOccurred())
 
-			// reconcile again to cover "update" path
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+			It("requeues the request, if a retryable error occurs", func() {
+				prepareFindDomain(res, http.StatusOK)
+				prepareDeleteDomain(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
 			})
-			Expect(err).NotTo(HaveOccurred())
 
-			domain := &operatorv1alpha1.Domain{}
-			err = k8sClient.Get(ctx, typeNamespacedName, domain)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(domain.Status.Conditions).ToNot(BeEmpty())
+			It("deletes the domain", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusOK)
+				prepareDeleteDomain(res, http.StatusOK)
+
+				_, err := reconcile(true)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation).To(BeComparableTo(&operatorv1alpha1.Domain{}))
+			})
 		})
 
-		It("should successfully remove the resource", func() {
-			By("Reconciling the deleted resource")
-			err := k8sClient.Delete(ctx, domain)
-			Expect(err).NotTo(HaveOccurred())
+		// Info: this must be after deleting the resource, because we're creating it again.
+		When("creating a Domain that already exists", func() {
+			BeforeAll(func() {
+				res = CreateResource(operatorv1alpha1.Domain{}, name, domain).(*operatorv1alpha1.Domain)
+				err := k8sClient.Create(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
 
-			controllerReconciler := &DomainReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				ApiURL:   mailuMock,
-				ApiToken: "asdf",
-			}
-
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
 			})
-			Expect(err).NotTo(HaveOccurred())
 
-			domain := &operatorv1alpha1.Domain{}
-			err = k8sClient.Get(ctx, typeNamespacedName, domain)
-			Expect(err).To(HaveOccurred())
+			It("finds an existing domain, updates status and adds a finalizer", func() {
+				Expect(res.GetFinalizers()).To(HaveLen(0))
+				Expect(res.Status.Conditions).To(HaveLen(0))
+
+				prepareFindDomain(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
+			})
 		})
 
-		It("should fail without API credentials", func() {
-			By("Reconciling the resource")
-			mux := chi.NewMux()
-			mux.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusUnauthorized)
-				_, _ = w.Write([]byte(`{"code": 401, "message":"Authorization required"}`))
+		When("deleting a Domain that does not exist", func() {
+			BeforeAll(func() {
+				res = resAfterReconciliation.DeepCopy()
+				err := k8sClient.Delete(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
 			})
-			httpSrv := httptest.NewServer(mux)
-			DeferCleanup(httpSrv.Close)
 
-			controllerReconciler := &DomainReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				ApiURL:   httpSrv.URL,
-				ApiToken: "asdf",
-			}
+			It("does not delete the alias", func() {
+				prepareFindDomain(res, http.StatusNotFound)
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				_, err := reconcile(true)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation).To(BeComparableTo(&operatorv1alpha1.Domain{}))
 			})
-			Expect(err).To(HaveOccurred())
-		})
-
-		It("should fail with invalid API credentials", func() {
-			By("Reconciling the resource")
-			mux := chi.NewMux()
-			mux.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				_, _ = w.Write([]byte(`{"code": 403, "message":"You are not authorized to access this resource"}`))
-			})
-			httpSrv := httptest.NewServer(mux)
-			DeferCleanup(httpSrv.Close)
-
-			controllerReconciler := &DomainReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				ApiURL:   httpSrv.URL,
-				ApiToken: "asdf",
-			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).To(HaveOccurred())
-		})
-
-		It("should retry when API is unavailable", func() {
-			By("Reconciling the resource")
-			mux := chi.NewMux()
-			mux.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusServiceUnavailable)
-				_, _ = w.Write([]byte(`{"code": 503, "message":"Temporarily unavailable"}`))
-			})
-			httpSrv := httptest.NewServer(mux)
-			DeferCleanup(httpSrv.Close)
-
-			controllerReconciler := &DomainReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				ApiURL:   httpSrv.URL,
-				ApiToken: "asdf",
-			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })

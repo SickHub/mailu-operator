@@ -22,12 +22,16 @@ import (
 
 // AliasSpec defines the desired state of Alias
 type AliasSpec struct {
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	Comment     string   `json:"comment,omitempty"`
+	// Name part of e-mail address 'name@domain'.
+	Name string `json:"name"`
+	// Domain part of e-mail address 'name@domain'.
+	Domain string `json:"domain"`
+	// Comment is a custom comment for the alias.
+	Comment string `json:"comment,omitempty"`
+	// Destination is a list of destinations for e-mails to 'name@domain'.
 	Destination []string `json:"destination,omitempty"`
-	Name        string   `json:"name"`
-	Domain      string   `json:"domain"`
-	Wildcard    bool     `json:"wildcard,omitempty"`
+	// Wildcard must be set to 'true' if the name contains the wildcard character '%'.
+	Wildcard bool `json:"wildcard,omitempty"`
 }
 
 // AliasStatus defines the observed state of Alias
