@@ -119,6 +119,20 @@ var _ = Describe("Alias Controller", func() {
 				condition := meta.FindStatusCondition(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)
 				Expect(condition.Reason).To(Equal("Error"))
 			})
+
+			It("updates the status, if creation fails with conflict", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindAlias(res, http.StatusNotFound)
+				prepareCreateAlias(res, http.StatusConflict)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
+				Expect(result.Requeue).To(BeTrue())
+			})
 		})
 
 		When("updating an Alias", func() {
@@ -254,5 +268,4 @@ var _ = Describe("Alias Controller", func() {
 			})
 		})
 	})
-
 })

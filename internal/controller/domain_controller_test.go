@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
 	. "github.com/sickhub/mailu-operator/internal/controller"
@@ -36,9 +35,7 @@ var _ = Describe("Domain Controller", func() {
 			Namespace: res.GetNamespace(),
 		}
 		var resultErr error
-		result, resultErr = controllerReconciler.Reconcile(ctx, reconcile.Request{
-			NamespacedName: typeNamespacedName,
-		})
+		result, resultErr = controllerReconciler.Reconcile(ctx, res)
 
 		resAfterReconciliation = &operatorv1alpha1.Domain{}
 		err := k8sClient.Get(ctx, typeNamespacedName, resAfterReconciliation)
@@ -72,7 +69,21 @@ var _ = Describe("Domain Controller", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
+			It("updates the status, if creation fails", func() {
+				prepareFindDomain(res, http.StatusNotFound)
+				prepareCreateDomain(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
+			})
+
 			It("creates the domain, updates status and adds a finalizer", func() {
+				res = resAfterReconciliation.DeepCopy()
 				prepareFindDomain(res, http.StatusNotFound)
 				prepareCreateDomain(res, http.StatusOK)
 
@@ -83,32 +94,56 @@ var _ = Describe("Domain Controller", func() {
 				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
 			})
-		})
 
-		When("creating a Domain that already exists", func() {
-			BeforeAll(func() {
-				res = CreateResource(operatorv1alpha1.Domain{}, "existing.com", "existing.com").(*operatorv1alpha1.Domain)
-				err := k8sClient.Create(ctx, res)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			It("finds an existing domain, updates status and adds a finalizer", func() {
-				prepareFindDomain(res, http.StatusOK)
-				preparePatchDomain(res, http.StatusOK)
+			It("requeues the request, if a retryable error occurs", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusServiceUnavailable)
 
 				_, err := reconcile(false)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
 				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(result.Requeue).To(BeTrue())
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
+			})
+
+			It("updates status, if a permanent error occurs", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusBadRequest)
+
+				_, err := reconcile(false)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(result.Requeue).To(BeFalse())
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeFalse())
+				condition := meta.FindStatusCondition(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)
+				Expect(condition.Reason).To(Equal("Error"))
+			})
+
+			It("updates the status, if creation fails with conflict", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusNotFound)
+				prepareCreateDomain(res, http.StatusConflict)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
+				Expect(result.Requeue).To(BeTrue())
 			})
 		})
 
 		When("updating a Domain", func() {
 			BeforeAll(func() {
-				resAfterReconciliation.Spec.Comment = mockComment
-				err := k8sClient.Update(ctx, resAfterReconciliation)
+				res = resAfterReconciliation.DeepCopy()
+				res.Spec.Comment = mockComment
+				err := k8sClient.Update(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -122,30 +157,110 @@ var _ = Describe("Domain Controller", func() {
 				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
 			})
+
+			It("does nothing, if there is no change", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusOK)
+
+				_, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
+			})
+
+			It("requeues the request, if a retryable error occurs", func() {
+				res = resAfterReconciliation.DeepCopy()
+				res.Spec.Comment = mockComment + "1"
+				err := k8sClient.Update(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				prepareFindDomain(resAfterReconciliation, http.StatusOK)
+				preparePatchDomain(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment + "1"))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
+			})
 		})
 
-		When("receiving an error from the API", func() {
-			It("updates the status upon failure", func() {
-				prepareFindDomain(resAfterReconciliation, http.StatusNotFound)
-				prepareCreateDomain(resAfterReconciliation, http.StatusConflict)
+		When("deleting a Domain", func() {
+			BeforeAll(func() {
+				res = resAfterReconciliation.DeepCopy()
+				err := k8sClient.Delete(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("requeues the request, if a retryable error occurs", func() {
+				prepareFindDomain(res, http.StatusOK)
+				prepareDeleteDomain(res, http.StatusServiceUnavailable)
+
+				result, err := reconcile(false)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeFalse())
+				Expect(result.Requeue).To(BeTrue())
+			})
+
+			It("deletes the domain", func() {
+				res = resAfterReconciliation.DeepCopy()
+				prepareFindDomain(res, http.StatusOK)
+				prepareDeleteDomain(res, http.StatusOK)
+
+				_, err := reconcile(true)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resAfterReconciliation).To(BeComparableTo(&operatorv1alpha1.Domain{}))
+			})
+		})
+
+		// Info: this must be after deleting the resource, because we're creating it again.
+		When("creating a Domain that already exists", func() {
+			BeforeAll(func() {
+				res = CreateResource(operatorv1alpha1.Domain{}, name, domain).(*operatorv1alpha1.Domain)
+				err := k8sClient.Create(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("finds an existing domain, updates status and adds a finalizer", func() {
+				Expect(res.GetFinalizers()).To(HaveLen(0))
+				Expect(res.Status.Conditions).To(HaveLen(0))
+
+				prepareFindDomain(res, http.StatusOK)
 
 				_, err := reconcile(false)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
-				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeFalse())
+				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, DomainConditionTypeReady)).To(BeTrue())
 			})
 		})
 
-		When("deleting an Domain", func() {
+		When("deleting a Domain that does not exist", func() {
 			BeforeAll(func() {
-				err := k8sClient.Delete(ctx, resAfterReconciliation)
+				res = resAfterReconciliation.DeepCopy()
+				err := k8sClient.Delete(ctx, res)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			It("deletes the domain", func() {
-				prepareFindDomain(resAfterReconciliation, http.StatusOK)
-				prepareDeleteDomain(resAfterReconciliation, http.StatusOK)
+			It("does not delete the alias", func() {
+				prepareFindDomain(res, http.StatusNotFound)
 
 				_, err := reconcile(true)
 				Expect(err).ToNot(HaveOccurred())

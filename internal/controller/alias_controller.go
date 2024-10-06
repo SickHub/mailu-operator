@@ -108,7 +108,7 @@ func (r *AliasReconciler) reconcile(ctx context.Context, alias *operatorv1alpha1
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
 		// we explicitly set the error in the status only on a permanent (non-retryable) error
-		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		logr.Error(err, "failed to get alias")
 		return ctrl.Result{}, nil
 	}
@@ -134,7 +134,7 @@ func (r *AliasReconciler) create(ctx context.Context, alias *operatorv1alpha1.Al
 
 	retry, err := r.createAlias(ctx, alias)
 	if err != nil {
-		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to create alias, requeueing: %w", err).Error())
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
@@ -143,7 +143,7 @@ func (r *AliasReconciler) create(ctx context.Context, alias *operatorv1alpha1.Al
 		return ctrl.Result{}, err
 	}
 
-	meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionTrue, "Created", "Alias created in MailU"))
+	meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Created", "Alias created in MailU"))
 
 	return ctrl.Result{Requeue: retry}, nil
 }
@@ -165,14 +165,14 @@ func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Al
 	jsonOld, _ := json.Marshal(apiAlias) //nolint:errcheck
 
 	if reflect.DeepEqual(jsonNew, jsonOld) {
-		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
 		logr.Info("no update needed")
 		return ctrl.Result{}, nil
 	}
 
 	retry, err := r.updateAlias(ctx, newAlias)
 	if err != nil {
-		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to update alias, requeueing: %w", err).Error())
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
@@ -181,7 +181,7 @@ func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Al
 		return ctrl.Result{}, err
 	}
 
-	meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
+	meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
 
 	return ctrl.Result{Requeue: retry}, nil
 }
@@ -192,7 +192,7 @@ func (r *AliasReconciler) delete(ctx context.Context, alias *operatorv1alpha1.Al
 
 	retry, err := r.deleteAlias(ctx, alias)
 	if err != nil {
-		meta.SetStatusCondition(&alias.Status.Conditions, getReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
+		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to delete alias, requeueing: %w", err).Error())
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
@@ -336,7 +336,7 @@ func (r *AliasReconciler) deleteAlias(ctx context.Context, alias *operatorv1alph
 	return false, errors.New("unknown status: " + strconv.Itoa(res.StatusCode))
 }
 
-func getReadyCondition(status metav1.ConditionStatus, reason, message string) metav1.Condition {
+func getAliasReadyCondition(status metav1.ConditionStatus, reason, message string) metav1.Condition {
 	return metav1.Condition{
 		Type:    AliasConditionTypeReady,
 		Status:  status,
