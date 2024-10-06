@@ -2,5 +2,17 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "enabledManagers": ["regex", "dockerfile", "github-actions", "gomod"],
+  "regexManagers": [
+    {
+      "fileMatch": [
+        "^Makefile$"
+      ],
+      "matchStrings": [
+        ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>.*?):(?<depName>.*?)\\n"
+      ],
+      "versioningTemplate": "semver"
+    }
   ]
 }
