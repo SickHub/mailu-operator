@@ -11,7 +11,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.3
   name: aliases.operator.mailu.io
 spec:
   group: operator.mailu.io
@@ -48,16 +48,23 @@ spec:
             description: AliasSpec defines the desired state of Alias
             properties:
               comment:
+                description: Comment is a custom comment for the alias.
                 type: string
               destination:
+                description: Destination is a list of destinations for e-mails to
+                  'name@domain'.
                 items:
                   type: string
                 type: array
               domain:
+                description: Domain part of e-mail address 'name@domain'.
                 type: string
               name:
+                description: Name part of e-mail address 'name@domain'.
                 type: string
               wildcard:
+                description: Wildcard must be set to 'true' if the name contains the
+                  wildcard character '%'.
                 type: boolean
             required:
             - domain
@@ -68,16 +75,8 @@ spec:
             properties:
               conditions:
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -118,12 +117,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -146,7 +140,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.3
   name: domains.operator.mailu.io
 spec:
   group: operator.mailu.io
@@ -183,20 +177,27 @@ spec:
             description: DomainSpec defines the desired state of Domain
             properties:
               alternatives:
+                description: Alternatives contains alternative domain names.
                 items:
                   type: string
                 type: array
               comment:
+                description: Comment is a custom comment for the domain.
                 type: string
               maxAliases:
+                description: MaxAliases, -1 for unlimited.
                 type: integer
               maxQuotaBytes:
+                description: MaxQuotaBytes, -1 for unlimited.
                 type: integer
               maxUsers:
+                description: MaxUsers, -1 for unlimited.
                 type: integer
               name:
+                description: Domain name.
                 type: string
               signupEnabled:
+                description: SignupEnabled allows users to self-signup for this domain.
                 type: boolean
             required:
             - name
@@ -206,16 +207,8 @@ spec:
             properties:
               conditions:
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -256,12 +249,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -284,7 +272,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.3
   name: users.operator.mailu.io
 spec:
   group: operator.mailu.io
@@ -321,59 +309,94 @@ spec:
             description: UserSpec defines the desired state of User
             properties:
               allowSpoofing:
+                description: AllowSpoofing allows this user to send e-mails with any
+                  sender.
                 type: boolean
               changePassword:
+                description: ChangePassword requires the user to change the password
+                  on next login.
                 type: boolean
               comment:
+                description: Comment is a custom comment for the user.
                 type: string
               displayedName:
+                description: DisplayName is the name displayed for this user.
                 type: string
               domain:
+                description: Domain part of e-mail address 'name@domain'.
                 type: string
               enableIMAP:
+                description: EnableIMAP states if IMAP is available to the user.
                 type: boolean
               enablePOP:
+                description: EnablePOP states if POP3 is available to the user.
                 type: boolean
               enabled:
+                description: Enabled states the status of this user account.
                 type: boolean
               forwardDestination:
+                description: ForwardDestination states the destination(s) to forward
+                  e-mail to.
                 items:
                   type: string
                 type: array
               forwardEnabled:
+                description: ForwardEnabled states if e-mails are forwarded.
                 type: boolean
               forwardKeep:
+                description: ForwardKeep states if forwarded e-mail should be kept
+                  in the mailbox.
                 type: boolean
               globalAdmin:
+                description: GlobalAdmin states if the user has global admin privileges.
                 type: boolean
               name:
+                description: Name part of e-mail address 'name@domain'.
                 type: string
               passwordKey:
+                description: PasswordKey is the key in the secret that contains the
+                  password.
                 type: string
               passwordSecret:
+                description: PasswordSecret is the name of the secret which contains
+                  the password.
                 type: string
               quotaBytes:
+                description: QuotaBytes defines the storage quota, -1 for unlimited.
                 format: int64
                 type: integer
               rawPassword:
+                description: RawPassword is the plaintext password for user creation.
                 type: string
               replyBody:
+                description: ReplyBody is the body for auto-reply e-mails.
                 type: string
               replyEnabled:
+                description: ReplyEnabled states if e-mails should be auto-replied
+                  to.
                 type: boolean
               replyEndDate:
+                description: ReplyEndDate is the date until which auto-reply e-mails
+                  should be sent.
                 format: date
                 type: string
               replyStartDate:
+                description: ReplyStartDate is the date from which on auto-reply e-mails
+                  should be sent.
                 format: date
                 type: string
               replySubject:
+                description: ReplySubject is the subject for auto-reply e-mails.
                 type: string
               spamEnabled:
+                description: SpamEnabled states if e-mail should be scanned for SPAM.
                 type: boolean
               spamMarkAsRead:
+                description: SpamMarkAsRead states if identified SPAM e-mails should
+                  be marked as read.
                 type: boolean
               spamThreshold:
+                description: SpamThreshold is the threshold for the SPAM filter.
                 type: integer
             required:
             - domain
@@ -384,16 +407,8 @@ spec:
             properties:
               conditions:
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -434,12 +449,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -624,57 +634,7 @@ rules:
   - operator.mailu.io
   resources:
   - aliases
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - operator.mailu.io
-  resources:
-  - aliases/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - operator.mailu.io
-  resources:
-  - aliases/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - operator.mailu.io
-  resources:
   - domains
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - operator.mailu.io
-  resources:
-  - domains/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - operator.mailu.io
-  resources:
-  - domains/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - operator.mailu.io
-  resources:
   - users
   verbs:
   - create
@@ -687,12 +647,16 @@ rules:
 - apiGroups:
   - operator.mailu.io
   resources:
+  - aliases/finalizers
+  - domains/finalizers
   - users/finalizers
   verbs:
   - update
 - apiGroups:
   - operator.mailu.io
   resources:
+  - aliases/status
+  - domains/status
   - users/status
   verbs:
   - get
@@ -881,7 +845,7 @@ spec:
           value: http://mailu-front.mail:80/api/v1
         - name: MAILU_TOKEN
           value: asdf
-        image: drpsychick/mailu-operator:0.0.2
+        image: drpsychick/mailu-operator:0.1.0
         livenessProbe:
           httpGet:
             path: /healthz
