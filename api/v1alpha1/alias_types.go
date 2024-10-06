@@ -22,19 +22,15 @@ import (
 
 // AliasSpec defines the desired state of Alias
 type AliasSpec struct {
-	// Comment for the alias.
-	Comment string `json:"comment,omitempty"`
-	// Destination(s) for e-mails to 'name@domain'.
-	// TODO use a simplified regex to validate?
-	Destination []string `json:"destination,omitempty"`
 	// Name part of e-mail address 'name@domain'.
-	// TODO use a simplified regex to validate?
 	Name string `json:"name"`
 	// Domain part of e-mail address 'name@domain'.
-	// TODO use regex to validate? https://stackoverflow.com/questions/10306690/what-is-a-regular-expression-which-will-match-a-valid-domain-name-without-a-subd
-	// ^(((?!-))(xn--|_)?[a-z0-9-]{0,61}[a-z0-9]{1,1}\.)*(xn--)?([a-z0-9][a-z0-9\-]{0,60}|[a-z0-9-]{1,30}\.[a-z]{2,})$
 	Domain string `json:"domain"`
-	// Set to 'true' if the name contains wildcard character '%'.
+	// Comment is a custom comment for the alias.
+	Comment string `json:"comment,omitempty"`
+	// Destination is a list of destinations for e-mails to 'name@domain'.
+	Destination []string `json:"destination,omitempty"`
+	// Wildcard must be set to 'true' if the name contains the wildcard character '%'.
 	Wildcard bool `json:"wildcard,omitempty"`
 }
 

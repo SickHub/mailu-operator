@@ -24,17 +24,19 @@ import (
 type DomainSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// Domain name.
-	// TODO use a simplified regex to validate?
-	Name    string `json:"name"`
+	Name string `json:"name"`
+	// Comment is a custom comment for the domain.
 	Comment string `json:"comment,omitempty"`
-	// -1 ... x
+	// MaxUsers, -1 for unlimited.
 	MaxUsers int `json:"maxUsers,omitempty"`
-	// -1 ... x
+	// MaxAliases, -1 for unlimited.
 	MaxAliases int `json:"maxAliases,omitempty"`
-	// ?
-	MaxQuotaBytes int      `json:"maxQuotaBytes,omitempty"`
-	SignupEnabled bool     `json:"signupEnabled,omitempty"`
-	Alternatives  []string `json:"alternatives,omitempty"`
+	// MaxQuotaBytes, -1 for unlimited.
+	MaxQuotaBytes int `json:"maxQuotaBytes,omitempty"`
+	// SignupEnabled allows users to self-signup for this domain.
+	SignupEnabled bool `json:"signupEnabled,omitempty"`
+	// Alternatives contains alternative domain names.
+	Alternatives []string `json:"alternatives,omitempty"`
 }
 
 // DomainStatus defines the observed state of Domain

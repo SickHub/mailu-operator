@@ -40,61 +40,94 @@ spec:
             description: UserSpec defines the desired state of User
             properties:
               allowSpoofing:
+                description: AllowSpoofing allows this user to send e-mails with any
+                  sender.
                 type: boolean
               changePassword:
+                description: ChangePassword requires the user to change the password
+                  on next login.
                 type: boolean
               comment:
+                description: Comment is a custom comment for the user.
                 type: string
               displayedName:
+                description: DisplayName is the name displayed for this user.
                 type: string
               domain:
-                description: TODO validate with regex?
+                description: Domain part of e-mail address 'name@domain'.
                 type: string
               enableIMAP:
+                description: EnableIMAP states if IMAP is available to the user.
                 type: boolean
               enablePOP:
+                description: EnablePOP states if POP3 is available to the user.
                 type: boolean
               enabled:
+                description: Enabled states the status of this user account.
                 type: boolean
               forwardDestination:
-                description: TODO validate with regex
+                description: ForwardDestination states the destination(s) to forward
+                  e-mail to.
                 items:
                   type: string
                 type: array
               forwardEnabled:
+                description: ForwardEnabled states if e-mails are forwarded.
                 type: boolean
               forwardKeep:
+                description: ForwardKeep states if forwarded e-mail should be kept
+                  in the mailbox.
                 type: boolean
               globalAdmin:
+                description: GlobalAdmin states if the user has global admin privileges.
                 type: boolean
               name:
+                description: Name part of e-mail address 'name@domain'.
                 type: string
               passwordKey:
+                description: PasswordKey is the key in the secret that contains the
+                  password.
                 type: string
               passwordSecret:
+                description: PasswordSecret is the name of the secret which contains
+                  the password.
                 type: string
               quotaBytes:
+                description: QuotaBytes defines the storage quota, -1 for unlimited.
                 format: int64
                 type: integer
               rawPassword:
+                description: RawPassword is the plaintext password for user creation.
                 type: string
               replyBody:
+                description: ReplyBody is the body for auto-reply e-mails.
                 type: string
               replyEnabled:
+                description: ReplyEnabled states if e-mails should be auto-replied
+                  to.
                 type: boolean
               replyEndDate:
+                description: ReplyEndDate is the date until which auto-reply e-mails
+                  should be sent.
                 format: date
                 type: string
               replyStartDate:
+                description: ReplyStartDate is the date from which on auto-reply e-mails
+                  should be sent.
                 format: date
                 type: string
               replySubject:
+                description: ReplySubject is the subject for auto-reply e-mails.
                 type: string
               spamEnabled:
+                description: SpamEnabled states if e-mail should be scanned for SPAM.
                 type: boolean
               spamMarkAsRead:
+                description: SpamMarkAsRead states if identified SPAM e-mails should
+                  be marked as read.
                 type: boolean
               spamThreshold:
+                description: SpamThreshold is the threshold for the SPAM filter.
                 type: integer
             required:
             - domain
