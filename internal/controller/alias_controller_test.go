@@ -131,7 +131,7 @@ var _ = Describe("Alias Controller", func() {
 
 				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
 				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
-				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
+				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
 				Expect(result.Requeue).To(BeTrue())
 			})
 		})

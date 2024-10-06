@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -90,15 +89,6 @@ func (r *UserReconciler) reconcile(ctx context.Context, user *operatorv1alpha1.U
 		api, err := mailu.NewClient(r.ApiURL, mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
 			req.Header.Add("Authorization", "Bearer "+r.ApiToken)
 			return nil
-		}), mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-			// TODO: make this optional
-			body := make([]byte, 0)
-			if req.Body != nil {
-				body, _ = io.ReadAll(req.Body) //nolint:errcheck
-				req.Body = io.NopCloser(bytes.NewBuffer(body))
-			}
-			logr.Info(fmt.Sprintf("request %s %s: %s", req.Method, req.URL.Path, body))
-			return nil
 		}))
 		if err != nil {
 			return ctrl.Result{}, err
@@ -134,8 +124,7 @@ func (r *UserReconciler) reconcile(ctx context.Context, user *operatorv1alpha1.U
 }
 
 func (r *UserReconciler) create(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "user", user.Name)
-	logr.Info("create user")
+	logr := log.FromContext(ctx, "namespace", user.Namespace, "user", user.Name)
 
 	retry, err := r.createUser(ctx, user)
 	if err != nil {
@@ -148,14 +137,16 @@ func (r *UserReconciler) create(ctx context.Context, user *operatorv1alpha1.User
 		return ctrl.Result{}, err
 	}
 
-	meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Created", "User created in MailU"))
+	if !retry {
+		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Created", "User created in MailU"))
+		logr.Info("created user")
+	}
 
 	return ctrl.Result{Requeue: retry}, nil
 }
 
 func (r *UserReconciler) update(ctx context.Context, user *operatorv1alpha1.User, apiUser *mailu.User) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "user", user.Name)
-	logr.Info("update user")
+	logr := log.FromContext(ctx, "namespace", user.Namespace, "user", user.Name)
 
 	newUser, err := r.userFromSpec(user.Spec)
 	if err != nil {
@@ -174,7 +165,6 @@ func (r *UserReconciler) update(ctx context.Context, user *operatorv1alpha1.User
 
 	if reflect.DeepEqual(jsonNew, jsonOld) {
 		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Updated", "User updated in MailU"))
-		logr.Info("no update needed")
 		return ctrl.Result{}, nil
 	}
 
@@ -189,14 +179,16 @@ func (r *UserReconciler) update(ctx context.Context, user *operatorv1alpha1.User
 		return ctrl.Result{}, err
 	}
 
-	meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Updated", "User updated in MailU"))
+	if !retry {
+		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Updated", "User updated in MailU"))
+		logr.Info("updated user")
+	}
 
 	return ctrl.Result{Requeue: retry}, nil
 }
 
 func (r *UserReconciler) delete(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "user", user.Name)
-	logr.Info("delete user")
+	logr := log.FromContext(ctx, "namespace", user.Namespace, "user", user.Name)
 
 	retry, err := r.deleteUser(ctx, user)
 	if err != nil {
@@ -207,6 +199,10 @@ func (r *UserReconciler) delete(ctx context.Context, user *operatorv1alpha1.User
 		}
 		logr.Error(err, "failed to delete user")
 		return ctrl.Result{}, err
+	}
+
+	if !retry {
+		logr.Info("deleted user")
 	}
 
 	return ctrl.Result{Requeue: retry}, nil
