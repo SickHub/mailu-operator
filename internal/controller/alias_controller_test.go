@@ -7,11 +7,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
-	. "github.com/sickhub/mailu-operator/internal/controller"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	operatorv1alpha1 "github.com/sickhub/mailu-operator/api/v1alpha1"
+	. "github.com/sickhub/mailu-operator/internal/controller"
 )
 
 var _ = Describe("Alias Controller", func() {
