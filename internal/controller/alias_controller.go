@@ -155,6 +155,7 @@ func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Al
 
 	if reflect.DeepEqual(jsonNew, jsonOld) {
 		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
+		logr.Info("alias is up to date, no change needed")
 		return ctrl.Result{}, nil
 	}
 

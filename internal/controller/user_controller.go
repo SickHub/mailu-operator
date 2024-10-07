@@ -165,6 +165,7 @@ func (r *UserReconciler) update(ctx context.Context, user *operatorv1alpha1.User
 
 	if reflect.DeepEqual(jsonNew, jsonOld) {
 		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Updated", "User updated in MailU"))
+		logr.Info("user is up to date, no change needed")
 		return ctrl.Result{}, nil
 	}
 

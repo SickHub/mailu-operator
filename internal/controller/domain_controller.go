@@ -158,10 +158,9 @@ func (r *DomainReconciler) update(ctx context.Context, domain *operatorv1alpha1.
 
 	if reflect.DeepEqual(jsonNew, jsonOld) {
 		meta.SetStatusCondition(&domain.Status.Conditions, getDomainReadyCondition(metav1.ConditionTrue, "Updated", "Domain updated in MailU"))
+		logr.Info("domain is up to date, no change needed")
 		return ctrl.Result{}, nil
 	}
-	logr.Info(fmt.Sprintf("old Domain: %s", jsonOld))
-	logr.Info(fmt.Sprintf("new Domain: %s", jsonNew))
 
 	retry, err := r.updateDomain(ctx, newDomain)
 	if err != nil {
