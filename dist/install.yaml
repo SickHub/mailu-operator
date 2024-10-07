@@ -872,7 +872,7 @@ spec:
           value: http://mailu-front.mail:80/api/v1
         - name: MAILU_TOKEN
           value: asdf
-        image: drpsychick/mailu-operator:0.1.0
+        image: drpsychick/mailu-operator:0.1.1
         livenessProbe:
           httpGet:
             path: /healthz
