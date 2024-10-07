@@ -72,6 +72,7 @@ spec:
                 description: Enabled states the status of this user account.
                 type: boolean
               forwardDestination:
+                default: []
                 description: ForwardDestination states the destination(s) to forward
                   e-mail to.
                 items:

@@ -51,6 +51,7 @@ spec:
                 description: Comment is a custom comment for the alias.
                 type: string
               destination:
+                default: []
                 description: Destination is a list of destinations for e-mails to
                   'name@domain'.
                 items:
@@ -63,6 +64,7 @@ spec:
                 description: Name part of e-mail address 'name@domain'.
                 type: string
               wildcard:
+                default: false
                 description: Wildcard must be set to 'true' if the name contains the
                   wildcard character '%'.
                 type: boolean
@@ -177,6 +179,7 @@ spec:
             description: DomainSpec defines the desired state of Domain
             properties:
               alternatives:
+                default: []
                 description: Alternatives contains alternative domain names.
                 items:
                   type: string
@@ -185,18 +188,22 @@ spec:
                 description: Comment is a custom comment for the domain.
                 type: string
               maxAliases:
-                description: MaxAliases, -1 for unlimited.
+                default: -1
+                description: MaxAliases, default -1 for unlimited.
                 type: integer
               maxQuotaBytes:
-                description: MaxQuotaBytes, -1 for unlimited.
+                default: 0
+                description: MaxQuotaBytes, default 0 for unlimited.
                 type: integer
               maxUsers:
-                description: MaxUsers, -1 for unlimited.
+                default: -1
+                description: MaxUsers, default -1 for unlimited.
                 type: integer
               name:
                 description: Domain name.
                 type: string
               signupEnabled:
+                default: false
                 description: SignupEnabled allows users to self-signup for this domain.
                 type: boolean
             required:
@@ -309,10 +316,12 @@ spec:
             description: UserSpec defines the desired state of User
             properties:
               allowSpoofing:
+                default: false
                 description: AllowSpoofing allows this user to send e-mails with any
                   sender.
                 type: boolean
               changePassword:
+                default: false
                 description: ChangePassword requires the user to change the password
                   on next login.
                 type: boolean
@@ -320,34 +329,42 @@ spec:
                 description: Comment is a custom comment for the user.
                 type: string
               displayedName:
+                default: ""
                 description: DisplayName is the name displayed for this user.
                 type: string
               domain:
                 description: Domain part of e-mail address 'name@domain'.
                 type: string
               enableIMAP:
+                default: false
                 description: EnableIMAP states if IMAP is available to the user.
                 type: boolean
               enablePOP:
+                default: false
                 description: EnablePOP states if POP3 is available to the user.
                 type: boolean
               enabled:
+                default: false
                 description: Enabled states the status of this user account.
                 type: boolean
               forwardDestination:
+                default: []
                 description: ForwardDestination states the destination(s) to forward
                   e-mail to.
                 items:
                   type: string
                 type: array
               forwardEnabled:
+                default: false
                 description: ForwardEnabled states if e-mails are forwarded.
                 type: boolean
               forwardKeep:
+                default: false
                 description: ForwardKeep states if forwarded e-mail should be kept
                   in the mailbox.
                 type: boolean
               globalAdmin:
+                default: false
                 description: GlobalAdmin states if the user has global admin privileges.
                 type: boolean
               name:
@@ -362,40 +379,50 @@ spec:
                   the password.
                 type: string
               quotaBytes:
-                description: QuotaBytes defines the storage quota, -1 for unlimited.
+                default: -1
+                description: QuotaBytes defines the storage quota, default -1 for
+                  unlimited.
                 format: int64
                 type: integer
               rawPassword:
                 description: RawPassword is the plaintext password for user creation.
                 type: string
               replyBody:
+                default: ""
                 description: ReplyBody is the body for auto-reply e-mails.
                 type: string
               replyEnabled:
+                default: false
                 description: ReplyEnabled states if e-mails should be auto-replied
                   to.
                 type: boolean
               replyEndDate:
+                default: "2999-12-31"
                 description: ReplyEndDate is the date until which auto-reply e-mails
                   should be sent.
                 format: date
                 type: string
               replyStartDate:
+                default: "1900-01-01"
                 description: ReplyStartDate is the date from which on auto-reply e-mails
                   should be sent.
                 format: date
                 type: string
               replySubject:
+                default: ""
                 description: ReplySubject is the subject for auto-reply e-mails.
                 type: string
               spamEnabled:
+                default: false
                 description: SpamEnabled states if e-mail should be scanned for SPAM.
                 type: boolean
               spamMarkAsRead:
+                default: false
                 description: SpamMarkAsRead states if identified SPAM e-mails should
                   be marked as read.
                 type: boolean
               spamThreshold:
+                default: 0
                 description: SpamThreshold is the threshold for the SPAM filter.
                 type: integer
             required:

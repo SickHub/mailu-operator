@@ -43,6 +43,7 @@ spec:
                 description: Comment is a custom comment for the alias.
                 type: string
               destination:
+                default: []
                 description: Destination is a list of destinations for e-mails to
                   'name@domain'.
                 items:

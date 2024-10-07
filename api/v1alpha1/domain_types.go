@@ -40,6 +40,7 @@ type DomainSpec struct {
 	// +kubebuilder:default=false
 	SignupEnabled bool `json:"signupEnabled,omitempty"`
 	// Alternatives contains alternative domain names.
+	// +kubebuilder:default={}
 	Alternatives []string `json:"alternatives,omitempty"`
 }
 

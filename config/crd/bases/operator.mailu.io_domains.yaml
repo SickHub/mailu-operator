@@ -40,6 +40,7 @@ spec:
             description: DomainSpec defines the desired state of Domain
             properties:
               alternatives:
+                default: []
                 description: Alternatives contains alternative domain names.
                 items:
                   type: string

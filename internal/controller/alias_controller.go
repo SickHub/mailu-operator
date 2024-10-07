@@ -144,12 +144,10 @@ func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Al
 	logr := log.FromContext(ctx)
 
 	newAlias := mailu.Alias{
-		Email:    alias.Spec.Name + "@" + alias.Spec.Domain,
-		Comment:  &alias.Spec.Comment,
-		Wildcard: &alias.Spec.Wildcard,
-	}
-	if alias.Spec.Destination != nil {
-		newAlias.Destination = &alias.Spec.Destination
+		Email:       alias.Spec.Name + "@" + alias.Spec.Domain,
+		Comment:     &alias.Spec.Comment,
+		Destination: &alias.Spec.Destination,
+		Wildcard:    &alias.Spec.Wildcard,
 	}
 
 	jsonNew, _ := json.Marshal(newAlias) //nolint:errcheck

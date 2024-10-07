@@ -29,6 +29,7 @@ type AliasSpec struct {
 	// Comment is a custom comment for the alias.
 	Comment string `json:"comment,omitempty"`
 	// Destination is a list of destinations for e-mails to 'name@domain'.
+	// +kubebuilder:default={}
 	Destination []string `json:"destination,omitempty"`
 	// Wildcard must be set to 'true' if the name contains the wildcard character '%'.
 	// +kubebuilder:default=false

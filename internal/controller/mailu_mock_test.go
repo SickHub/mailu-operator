@@ -174,30 +174,27 @@ func prepareFindUser(user *operatorv1alpha1.User, status int) {
 	response := getResponse(status)
 	if status == http.StatusOK {
 		newUser := mailu.User{
-			AllowSpoofing:     &user.Spec.AllowSpoofing,
-			ChangePwNextLogin: &user.Spec.ChangePassword,
-			Comment:           &user.Spec.Comment,
-			DisplayedName:     &user.Spec.DisplayedName,
-			Email:             user.Spec.Name + "@" + user.Spec.Domain,
-			Enabled:           &user.Spec.Enabled,
-			EnableImap:        &user.Spec.EnableIMAP,
-			EnablePop:         &user.Spec.EnablePOP,
-			ForwardEnabled:    &user.Spec.ForwardEnabled,
-			ForwardKeep:       &user.Spec.ForwardKeep,
-			GlobalAdmin:       &user.Spec.GlobalAdmin,
-			Password:          &user.Spec.Name,
-			QuotaBytes:        &user.Spec.QuotaBytes,
-			QuotaBytesUsed:    &user.Spec.QuotaBytes,
-			ReplyBody:         &user.Spec.ReplyBody,
-			ReplyEnabled:      &user.Spec.ReplyEnabled,
-			ReplySubject:      &user.Spec.ReplySubject,
-			SpamEnabled:       &user.Spec.SpamEnabled,
-			SpamMarkAsRead:    &user.Spec.SpamMarkAsRead,
-			SpamThreshold:     &user.Spec.SpamThreshold,
-		}
-		// mimick API behaviour
-		if user.Spec.ForwardDestination == nil {
-			newUser.ForwardDestination = &[]string{}
+			AllowSpoofing:      &user.Spec.AllowSpoofing,
+			ChangePwNextLogin:  &user.Spec.ChangePassword,
+			Comment:            &user.Spec.Comment,
+			DisplayedName:      &user.Spec.DisplayedName,
+			Email:              user.Spec.Name + "@" + user.Spec.Domain,
+			Enabled:            &user.Spec.Enabled,
+			EnableImap:         &user.Spec.EnableIMAP,
+			EnablePop:          &user.Spec.EnablePOP,
+			ForwardEnabled:     &user.Spec.ForwardEnabled,
+			ForwardDestination: &user.Spec.ForwardDestination,
+			ForwardKeep:        &user.Spec.ForwardKeep,
+			GlobalAdmin:        &user.Spec.GlobalAdmin,
+			Password:           &user.Spec.Name,
+			QuotaBytes:         &user.Spec.QuotaBytes,
+			QuotaBytesUsed:     &user.Spec.QuotaBytes,
+			ReplyBody:          &user.Spec.ReplyBody,
+			ReplyEnabled:       &user.Spec.ReplyEnabled,
+			ReplySubject:       &user.Spec.ReplySubject,
+			SpamEnabled:        &user.Spec.SpamEnabled,
+			SpamMarkAsRead:     &user.Spec.SpamMarkAsRead,
+			SpamThreshold:      &user.Spec.SpamThreshold,
 		}
 		if user.Spec.ReplyEndDate != "" {
 			d := &openapitypes.Date{}
@@ -246,10 +243,6 @@ func prepareCreateUser(user *operatorv1alpha1.User, status int) {
 		SpamEnabled:        &user.Spec.SpamEnabled,
 		SpamMarkAsRead:     &user.Spec.SpamMarkAsRead,
 		SpamThreshold:      &user.Spec.SpamThreshold,
-	}
-	// mimick API behaviour
-	if user.Spec.ForwardDestination == nil {
-		newUser.ForwardDestination = &[]string{}
 	}
 	if user.Spec.ReplyEndDate != "" {
 		d := &openapitypes.Date{}

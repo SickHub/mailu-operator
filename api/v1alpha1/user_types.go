@@ -50,6 +50,7 @@ type UserSpec struct {
 	// +kubebuilder:default=false
 	ForwardEnabled bool `json:"forwardEnabled,omitempty"`
 	// ForwardDestination states the destination(s) to forward e-mail to.
+	// +kubebuilder:default={}
 	ForwardDestination []string `json:"forwardDestination,omitempty"`
 	// ForwardKeep states if forwarded e-mail should be kept in the mailbox.
 	// +kubebuilder:default=false

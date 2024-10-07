@@ -388,11 +388,6 @@ func (r *UserReconciler) userFromSpec(spec operatorv1alpha1.UserSpec) (mailu.Use
 		SpamThreshold:      &spec.SpamThreshold,
 	}
 
-	// mimick API behaviour
-	if spec.ForwardDestination == nil {
-		u.ForwardDestination = &[]string{}
-	}
-
 	// convert Dates if set
 	if spec.ReplyStartDate != "" {
 		d := &openapitypes.Date{}

@@ -145,14 +145,12 @@ func (r *DomainReconciler) update(ctx context.Context, domain *operatorv1alpha1.
 
 	newDomain := mailu.Domain{
 		Name:          domain.Spec.Name,
+		Alternatives:  &domain.Spec.Alternatives,
 		Comment:       &domain.Spec.Comment,
 		MaxAliases:    &domain.Spec.MaxAliases,
 		MaxQuotaBytes: &domain.Spec.MaxQuotaBytes,
 		MaxUsers:      &domain.Spec.MaxUsers,
 		SignupEnabled: &domain.Spec.SignupEnabled,
-	}
-	if len(domain.Spec.Alternatives) > 0 {
-		newDomain.Alternatives = &domain.Spec.Alternatives
 	}
 
 	jsonNew, _ := json.Marshal(newDomain) //nolint:errcheck
@@ -162,6 +160,8 @@ func (r *DomainReconciler) update(ctx context.Context, domain *operatorv1alpha1.
 		meta.SetStatusCondition(&domain.Status.Conditions, getDomainReadyCondition(metav1.ConditionTrue, "Updated", "Domain updated in MailU"))
 		return ctrl.Result{}, nil
 	}
+	logr.Info(fmt.Sprintf("old Domain: %s", jsonOld))
+	logr.Info(fmt.Sprintf("new Domain: %s", jsonNew))
 
 	retry, err := r.updateDomain(ctx, newDomain)
 	if err != nil {
