@@ -55,6 +55,7 @@ spec:
                 description: Name part of e-mail address 'name@domain'.
                 type: string
               wildcard:
+                default: false
                 description: Wildcard must be set to 'true' if the name contains the
                   wildcard character '%'.
                 type: boolean

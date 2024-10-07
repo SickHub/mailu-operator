@@ -27,13 +27,17 @@ type DomainSpec struct {
 	Name string `json:"name"`
 	// Comment is a custom comment for the domain.
 	Comment string `json:"comment,omitempty"`
-	// MaxUsers, -1 for unlimited.
+	// MaxUsers, default -1 for unlimited.
+	// +kubebuilder:default=-1
 	MaxUsers int `json:"maxUsers,omitempty"`
-	// MaxAliases, -1 for unlimited.
+	// MaxAliases, default -1 for unlimited.
+	// +kubebuilder:default=-1
 	MaxAliases int `json:"maxAliases,omitempty"`
-	// MaxQuotaBytes, -1 for unlimited.
+	// MaxQuotaBytes, default 0 for unlimited.
+	// +kubebuilder:default=0
 	MaxQuotaBytes int `json:"maxQuotaBytes,omitempty"`
 	// SignupEnabled allows users to self-signup for this domain.
+	// +kubebuilder:default=false
 	SignupEnabled bool `json:"signupEnabled,omitempty"`
 	// Alternatives contains alternative domain names.
 	Alternatives []string `json:"alternatives,omitempty"`

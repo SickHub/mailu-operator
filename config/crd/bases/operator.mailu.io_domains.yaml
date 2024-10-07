@@ -48,18 +48,22 @@ spec:
                 description: Comment is a custom comment for the domain.
                 type: string
               maxAliases:
-                description: MaxAliases, -1 for unlimited.
+                default: -1
+                description: MaxAliases, default -1 for unlimited.
                 type: integer
               maxQuotaBytes:
-                description: MaxQuotaBytes, -1 for unlimited.
+                default: 0
+                description: MaxQuotaBytes, default 0 for unlimited.
                 type: integer
               maxUsers:
-                description: MaxUsers, -1 for unlimited.
+                default: -1
+                description: MaxUsers, default -1 for unlimited.
                 type: integer
               name:
                 description: Domain name.
                 type: string
               signupEnabled:
+                default: false
                 description: SignupEnabled allows users to self-signup for this domain.
                 type: boolean
             required:
