@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: drpsychick/mailu-operator
-  newTag: 0.1.0
+  newTag: 0.1.1
