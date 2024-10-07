@@ -3,6 +3,7 @@ package controller_test
 import (
 	"net/http"
 
+	openapitypes "github.com/oapi-codegen/runtime/types"
 	. "github.com/onsi/gomega/ghttp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -198,6 +199,23 @@ func prepareFindUser(user *operatorv1alpha1.User, status int) {
 		if user.Spec.ForwardDestination == nil {
 			newUser.ForwardDestination = &[]string{}
 		}
+		if user.Spec.ReplyEndDate != "" {
+			d := &openapitypes.Date{}
+			err := d.UnmarshalText([]byte(user.Spec.ReplyEndDate))
+			if err != nil {
+				return
+			}
+			newUser.ReplyEndDate = d
+		}
+		if user.Spec.ReplyStartDate != "" {
+			d := &openapitypes.Date{}
+			err := d.UnmarshalText([]byte(user.Spec.ReplyStartDate))
+			if err != nil {
+				return
+			}
+			newUser.ReplyStartDate = d
+		}
+
 		response = RespondWithJSONEncoded(http.StatusOK, newUser)
 	}
 	mock.AppendHandlers(CombineHandlers(
@@ -233,6 +251,23 @@ func prepareCreateUser(user *operatorv1alpha1.User, status int) {
 	if user.Spec.ForwardDestination == nil {
 		newUser.ForwardDestination = &[]string{}
 	}
+	if user.Spec.ReplyEndDate != "" {
+		d := &openapitypes.Date{}
+		err := d.UnmarshalText([]byte(user.Spec.ReplyEndDate))
+		if err != nil {
+			return
+		}
+		newUser.ReplyEndDate = d
+	}
+	if user.Spec.ReplyStartDate != "" {
+		d := &openapitypes.Date{}
+		err := d.UnmarshalText([]byte(user.Spec.ReplyStartDate))
+		if err != nil {
+			return
+		}
+		newUser.ReplyStartDate = d
+	}
+
 	mock.AppendHandlers(CombineHandlers(
 		VerifyRequest("POST", "/user"),
 		VerifyJSONRepresenting(newUser),

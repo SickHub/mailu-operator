@@ -146,9 +146,9 @@ func (r *DomainReconciler) update(ctx context.Context, domain *operatorv1alpha1.
 	newDomain := mailu.Domain{
 		Name:          domain.Spec.Name,
 		Comment:       &domain.Spec.Comment,
-		MaxUsers:      &domain.Spec.MaxUsers,
 		MaxAliases:    &domain.Spec.MaxAliases,
 		MaxQuotaBytes: &domain.Spec.MaxQuotaBytes,
+		MaxUsers:      &domain.Spec.MaxUsers,
 		SignupEnabled: &domain.Spec.SignupEnabled,
 	}
 	if len(domain.Spec.Alternatives) > 0 {

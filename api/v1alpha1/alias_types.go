@@ -31,6 +31,7 @@ type AliasSpec struct {
 	// Destination is a list of destinations for e-mails to 'name@domain'.
 	Destination []string `json:"destination,omitempty"`
 	// Wildcard must be set to 'true' if the name contains the wildcard character '%'.
+	// +kubebuilder:default=false
 	Wildcard bool `json:"wildcard,omitempty"`
 }
 
