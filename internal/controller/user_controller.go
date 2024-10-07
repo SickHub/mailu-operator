@@ -52,7 +52,7 @@ type UserReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
 func (r *UserReconciler) Reconcile(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "user", user.Name)
+	logr := log.FromContext(ctx)
 
 	userOriginal := user.DeepCopy()
 
@@ -83,7 +83,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, user *operatorv1alpha1.U
 }
 
 func (r *UserReconciler) reconcile(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "user", user.Name)
+	logr := log.FromContext(ctx)
 
 	if r.ApiClient == nil {
 		api, err := mailu.NewClient(r.ApiURL, mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
@@ -124,7 +124,7 @@ func (r *UserReconciler) reconcile(ctx context.Context, user *operatorv1alpha1.U
 }
 
 func (r *UserReconciler) create(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "namespace", user.Namespace, "user", user.Name)
+	logr := log.FromContext(ctx)
 
 	retry, err := r.createUser(ctx, user)
 	if err != nil {
@@ -146,7 +146,7 @@ func (r *UserReconciler) create(ctx context.Context, user *operatorv1alpha1.User
 }
 
 func (r *UserReconciler) update(ctx context.Context, user *operatorv1alpha1.User, apiUser *mailu.User) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "namespace", user.Namespace, "user", user.Name)
+	logr := log.FromContext(ctx)
 
 	newUser, err := r.userFromSpec(user.Spec)
 	if err != nil {
@@ -188,7 +188,7 @@ func (r *UserReconciler) update(ctx context.Context, user *operatorv1alpha1.User
 }
 
 func (r *UserReconciler) delete(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "namespace", user.Namespace, "user", user.Name)
+	logr := log.FromContext(ctx)
 
 	retry, err := r.deleteUser(ctx, user)
 	if err != nil {

@@ -47,7 +47,7 @@ type DomainReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
 func (r *DomainReconciler) Reconcile(ctx context.Context, domain *operatorv1alpha1.Domain) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "namespace", domain.Namespace, "domain", domain.Name)
+	logr := log.FromContext(ctx)
 
 	domainOriginal := domain.DeepCopy()
 
@@ -78,7 +78,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, domain *operatorv1alph
 }
 
 func (r *DomainReconciler) reconcile(ctx context.Context, domain *operatorv1alpha1.Domain) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "namespace", domain.Namespace, "domain", domain.Name)
+	logr := log.FromContext(ctx)
 
 	if r.ApiClient == nil {
 		api, err := mailu.NewClient(r.ApiURL, mailu.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
@@ -119,7 +119,7 @@ func (r *DomainReconciler) reconcile(ctx context.Context, domain *operatorv1alph
 }
 
 func (r *DomainReconciler) create(ctx context.Context, domain *operatorv1alpha1.Domain) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "namespace", domain.Namespace, "domain", domain.Name)
+	logr := log.FromContext(ctx)
 
 	retry, err := r.createDomain(ctx, domain)
 	if err != nil {
@@ -141,7 +141,7 @@ func (r *DomainReconciler) create(ctx context.Context, domain *operatorv1alpha1.
 }
 
 func (r *DomainReconciler) update(ctx context.Context, domain *operatorv1alpha1.Domain, apiDomain *mailu.Domain) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "namespace", domain.Namespace, "domain", domain.Name)
+	logr := log.FromContext(ctx)
 
 	newDomain := mailu.Domain{
 		Name:          domain.Spec.Name,
@@ -183,7 +183,7 @@ func (r *DomainReconciler) update(ctx context.Context, domain *operatorv1alpha1.
 }
 
 func (r *DomainReconciler) delete(ctx context.Context, domain *operatorv1alpha1.Domain) (ctrl.Result, error) {
-	logr := log.FromContext(ctx, "namespace", domain.Namespace, "domain", domain.Name)
+	logr := log.FromContext(ctx)
 
 	retry, err := r.deleteDomain(ctx, domain)
 	if err != nil {
