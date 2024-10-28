@@ -210,7 +210,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.3.0 # github-releases:kubernetes-sigs/kustomize
-CONTROLLER_TOOLS_VERSION ?= v0.16.4 # github-releases:kubernetes-sigs/controller-tools
+CONTROLLER_TOOLS_VERSION ?= v0.16.5 # github-releases:kubernetes-sigs/controller-tools
 ENVTEST_VERSION ?= release-0.19 # github-releases:kubernetes-sigs/controller-runtime
 GOLANGCI_LINT_VERSION ?= v1.61.0 # github-releases:golangci/golangci-lint
 
