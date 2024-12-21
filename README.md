@@ -1,5 +1,6 @@
 [![Workflow Status](https://img.shields.io/github/actions/workflow/status/sickhub/mailu-operator/publish.yml)](https://github.com/SickHub/mailu-operator/actions)
 [![Docker image](https://img.shields.io/docker/image-size/drpsychick/mailu-operator?sort=date)](https://hub.docker.com/r/drpsychick/mailu-operator/tags)
+[![Coverage Status](https://coveralls.io/repos/github/SickHub/mailu-operator/badge.svg?branch=main)](https://coveralls.io/github/SickHub/mailu-operator?branch=main)
 [![DockerHub pulls](https://img.shields.io/docker/pulls/drpsychick/mailu-operator.svg)](https://hub.docker.com/r/drpsychick/mailu-operator/)
 [![DockerHub stars](https://img.shields.io/docker/stars/drpsychick/mailu-operator.svg)](https://hub.docker.com/r/drpsychick/mailu-operator/)
 [![GitHub stars](https://img.shields.io/github/stars/sickhub/mailu-operator.svg)](https://github.com/sickhub/mailu-operator)
