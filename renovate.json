@@ -8,7 +8,7 @@
     {
       "fileMatch": [
         "^Makefile$",
-        "^.github/workflows/*.yml$"
+        "^.github/workflows/.*\\.yml$"
       ],
       "matchStrings": [
         ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>.*?):(?<depName>.*?)\\n",
