@@ -7,7 +7,8 @@
   "regexManagers": [
     {
       "fileMatch": [
-        "^Makefile$"
+        "^Makefile$",
+        "^.github/workflows/*.yml$"
       ],
       "matchStrings": [
         ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>.*?):(?<depName>.*?)\\n",
