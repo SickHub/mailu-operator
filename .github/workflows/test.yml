@@ -28,6 +28,8 @@ jobs:
 
       - name: Coveralls
         uses: coverallsapp/github-action@v2
+        with:
+          file: cover.out
 
       - name: Build operator image
         run: make docker-build
