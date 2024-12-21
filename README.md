@@ -261,6 +261,12 @@ It is generally advised to **create a fork** of the repo and create Pull-Request
 ## Contributing
 // TODO(user): Add detailed information on how you would like others to contribute to this project
 
+### Running GitHub Actions locally with `act`
+```shell
+# with Rancher Desktop on macOS with Apple Silicon
+DOCKER_HOST=unix://$HOME/.rd/docker.sock act --container-architecture linux/amd64 --rm --job analyze
+```
+
 **NOTE:** Run `make help` for more information on all potential `make` targets
 
 More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
