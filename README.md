@@ -256,8 +256,9 @@ It is generally advised to **create a fork** of the repo and create Pull-Request
 4. Push the tag
     ```shell
     git checkout main
+    git pull
     git tag v$VERSION
-    git push
+    git push --tags
     ```
 
 ## Contributing
