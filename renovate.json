@@ -6,6 +6,7 @@
   "enabledManagers": ["regex", "dockerfile", "github-actions", "gomod"],
   "regexManagers": [
     {
+      "description": "Update tool versions in Makefile",
       "fileMatch": [
         "^Makefile$"
       ],
@@ -13,6 +14,15 @@
         ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>.*?):(?<depName>.*?)\\n"
       ],
       "versioningTemplate": "semver"
+    },
+    {
+      "description": "Update go-version in GitHub Actions",
+      "fileMatch": [
+        "\\.github/workflows/.*\\.yml$"
+      ],
+      "matchStrings": [
+        ".*go-version: (?<currentValue>.*?) # (?<datasource>.*?):(?<depName>.*?)\\n"
+      ]
     }
   ]
 }

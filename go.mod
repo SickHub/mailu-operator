@@ -2,7 +2,7 @@ module github.com/sickhub/mailu-operator
 
 go 1.22.0
 
-toolchain go1.22.6
+toolchain go1.23.4
 
 require (
 	github.com/go-chi/chi/v5 v5.2.0
