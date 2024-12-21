@@ -115,10 +115,10 @@ Aliases are used to route emails for multiple email addresses to a user (email) 
 
 ### Prerequisites
 
-- go version v1.21.0+
+- go version v1.22.0+
 - docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+- kubectl version v1.30.0+.
+- Access to a Kubernetes v1.30.0+ cluster.
 - A running installation of [Mailu](https://github.com/Mailu/Mailu) with API enabled.
 
 
@@ -241,8 +241,9 @@ It is generally advised to **create a fork** of the repo and create Pull-Request
 
 1. Build the installer for the release tag:
     ```sh
-    git checkout -b release-0.0.2
-    VERSION=0.0.2 make build-installer
+    export VERSION=0.1.2
+    git checkout -b release-$VERSION
+    make build-installer
     ```
 
 2. Create a Pull-Request on GitHub with the changes
@@ -255,7 +256,7 @@ It is generally advised to **create a fork** of the repo and create Pull-Request
 4. Push the tag
     ```shell
     git checkout main
-    git tag v0.0.2
+    git tag v$VERSION
     git push
     ```
 
