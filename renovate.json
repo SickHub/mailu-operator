@@ -10,7 +10,8 @@
         "^Makefile$"
       ],
       "matchStrings": [
-        ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>.*?):(?<depName>.*?)\\n"
+        ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>.*?):(?<depName>.*?)\\n",
+        ".*go-version: (?<currentValue>.*?) # (?<datasource>.*?):(?<depName>.*?)\\n"
       ],
       "versioningTemplate": "semver"
     }
