@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -251,21 +252,11 @@ func (r *UserReconciler) createUser(ctx context.Context, user *operatorv1alpha1.
 	// raw password is required during creation
 	if user.Spec.RawPassword == "" {
 		var err error
-		if user.Spec.PasswordSecret != "" && user.Spec.PasswordKey != "" {
-			user.Spec.RawPassword, err = r.getUserPassword(ctx, user.Namespace, user.Spec.PasswordSecret, user.Spec.PasswordKey)
-			if err != nil {
-				logr.Error(err, fmt.Sprintf("failed to get password from secret %s/%s", user.Namespace, user.Spec.PasswordSecret))
-				return true, err
-			}
-			logr.Info(fmt.Sprintf("using password from secret for user %s", email))
-		} else {
-			// initial random password if none given
-			user.Spec.RawPassword, err = password.Generate(20, 2, 2, false, false)
-			if err != nil {
-				logr.Error(err, fmt.Sprintf("failed to generate password for user %s", email))
-				return true, err
-			}
-			logr.Info(fmt.Sprintf("using generated password for user %s", email))
+		user.Spec.RawPassword, err = r.getRawUserPassword(ctx, user)
+		if err != nil {
+			logr.Error(err, fmt.Sprintf("failed to get password for user %s", email))
+			// retry, because Secret could appear
+			return true, err
 		}
 	}
 
@@ -410,13 +401,47 @@ func (r *UserReconciler) userFromSpec(spec operatorv1alpha1.UserSpec) (mailu.Use
 	return u, nil
 }
 
+func (r *UserReconciler) getRawUserPassword(ctx context.Context, user *operatorv1alpha1.User) (string, error) {
+	var err error
+	pass := ""
+	email := user.Spec.Name + "@" + user.Spec.Domain
+	if user.Spec.PasswordSecret != "" && user.Spec.PasswordKey != "" {
+		pass, err = r.getUserPassword(ctx, user.Namespace, user.Spec.PasswordSecret, user.Spec.PasswordKey)
+		if err != nil {
+			log.FromContext(ctx).Error(err, fmt.Sprintf("failed to get password from secret %s/%s", user.Namespace, user.Spec.PasswordSecret))
+			return pass, err
+		}
+		log.FromContext(ctx).Info(fmt.Sprintf("using password from secret for user %s", email))
+	} else {
+		// initial random password if none given
+		pass, err = password.Generate(20, 2, 2, false, false)
+		if err != nil {
+			log.FromContext(ctx).Error(err, fmt.Sprintf("failed to generate password for user %s", email))
+			return pass, err
+		}
+		log.FromContext(ctx).Info(fmt.Sprintf("using generated password for user %s", email))
+	}
+	return pass, nil
+}
+
 func (r *UserReconciler) getUserPassword(ctx context.Context, namespace, secret, key string) (string, error) {
 	s := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{Name: secret, Namespace: namespace}, s)
 	if err != nil {
 		return "", err
 	}
-	return string(s.Data[key]), nil
+
+	if _, ok := s.Data[key]; !ok {
+		return "", errors.New("secret does not contain key " + key)
+	}
+
+	pass := make([]byte, base64.StdEncoding.DecodedLen(len(s.Data[key])))
+	decoded, err := base64.StdEncoding.Decode(pass, s.Data[key])
+	if err != nil {
+		return "", err
+	}
+
+	return string(pass[:decoded]), nil
 }
 
 func getUserReadyCondition(status metav1.ConditionStatus, reason, message string) metav1.Condition {
