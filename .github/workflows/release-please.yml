@@ -22,7 +22,6 @@ jobs:
         with:
           # to create PRs and trigger GitHub workflows, requires a PAT
           token: ${{ secrets.PAT_GITHUB_TOKEN }}
-          skip-github-release: true
 
       - run: echo $JSON
         name: Release Please Output Info

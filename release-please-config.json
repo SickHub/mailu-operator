@@ -5,7 +5,6 @@
       "package-name": "",
       "changelog-path": "CHANGELOG.md",
       "release-type": "go",
-      "include-v-in-tag": true,
       "extra-files": [
         "Makefile",
         "README.md",
