@@ -1,3 +1,9 @@
 {
-  ".": "0.1.2"
+  ".": "0.1.2",
+  "extra-files": [
+    "Makefile",
+    "README.md",
+    "dist/install.yaml",
+    "config/manager/kustomization.yaml"
+  ]
 }
