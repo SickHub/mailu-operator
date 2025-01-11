@@ -6,7 +6,12 @@
       "changelog-path": "CHANGELOG.md",
       "release-type": "go",
       "include-v-in-tag": false,
-      "prerelease": true
+      "extra-files": [
+        "Makefile",
+        "README.md",
+        "dist/install.yaml",
+        "config/manager/kustomization.yaml"
+      ]
     }
   },
   "release-search-depth": 100,
