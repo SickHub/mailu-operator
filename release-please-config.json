@@ -2,10 +2,10 @@
   "changelog-type": "default",
   "packages": {
     ".": {
-      "package-name": "mailu-operator",
+      "package-name": "",
       "changelog-path": "CHANGELOG.md",
       "release-type": "go",
-      "include-v-in-tag": false,
+      "include-v-in-tag": true,
       "extra-files": [
         "Makefile",
         "README.md",
