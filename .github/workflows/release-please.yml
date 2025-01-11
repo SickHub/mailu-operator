@@ -1,0 +1,31 @@
+---
+name: release-please
+
+on:
+  push:
+#    branches:
+#      - master
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      paths_released: ${{ steps.release.outputs.paths_released }}
+      releases_info: ${{ toJSON(steps.release.outputs) }}
+    steps:
+      - uses: google-github-actions/release-please-action@v3
+        id: release
+        with:
+          release-type: go
+          # to trigger GitHub workflows, requires a PAT
+          #token: ${{ secrets.GITHUB_TOKEN }}
+          # changelog-notes-type: github
+          # prerelease: true
+          include-v-in-tag: true
+          # Only check the last 50 commits to avoid rate limiting
+          commit-search-depth: 50
+
+      - run: echo $JSON
+        name: Release Please Output Info
+        env:
+          JSON: ${{ toJSON(steps.release.outputs) }}
