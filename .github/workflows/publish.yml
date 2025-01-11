@@ -63,9 +63,10 @@ jobs:
 #        with:
 #          file_pattern: 'dist/*.yaml'
 
-      # pushing a tag will trigger this
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          generate_release_notes: true
+# release-please will take care of tagging
+#      # pushing a tag will trigger this
+#      - name: Release
+#        uses: softprops/action-gh-release@v2
+#        if: startsWith(github.ref, 'refs/tags/')
+#        with:
+#          generate_release_notes: true
