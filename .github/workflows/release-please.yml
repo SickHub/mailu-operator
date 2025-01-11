@@ -21,8 +21,8 @@ jobs:
         id: release
         with:
           release-type: go
-          # to trigger GitHub workflows, requires a PAT
-          #token: ${{ secrets.GITHUB_TOKEN }}
+          # to create PRs and trigger GitHub workflows, requires a PAT
+          token: ${{ secrets.GITHUB_TOKEN }}
           # changelog-notes-type: github
           # prerelease: true
           include-v-in-tag: true
