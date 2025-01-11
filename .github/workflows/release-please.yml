@@ -20,14 +20,9 @@ jobs:
       - uses: google-github-actions/release-please-action@v4
         id: release
         with:
-          release-type: go
           # to create PRs and trigger GitHub workflows, requires a PAT
           token: ${{ secrets.PAT_GITHUB_TOKEN }}
-          # changelog-notes-type: github
-          # prerelease: true
-          include-v-in-tag: true
-          # Only check the last 50 commits to avoid rate limiting
-          commit-search-depth: 50
+          skip-github-release: true
 
       - run: echo $JSON
         name: Release Please Output Info

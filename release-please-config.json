@@ -1,4 +1,5 @@
 {
+  "changelog-type": "github",
   "packages": {
     "mailu-operator": {
       "package-name": "mailu-operator",
@@ -6,7 +7,8 @@
       "release-type": "go",
       "bump-minor-pre-major": false,
       "bump-patch-for-minor-pre-major": false,
-      "include-v-in-tag": true
+      "include-v-in-tag": true,
+      "prerelease": true
     }
   },
   "release-search-depth": 100,
