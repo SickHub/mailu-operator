@@ -3,9 +3,15 @@
   "extends": [
     "config:recommended"
   ],
-  "enabledManagers": ["regex", "dockerfile", "github-actions", "gomod"],
-  "regexManagers": [
+  "enabledManagers": [
+    "custom.regex",
+    "dockerfile",
+    "github-actions",
+    "gomod"
+  ],
+  "customManagers": [
     {
+      "customType": "regex",
       "description": "Update tool versions in Makefile",
       "fileMatch": [
         "^Makefile$"
@@ -16,6 +22,7 @@
       "versioningTemplate": "semver"
     },
     {
+      "customType": "regex",
       "description": "Update go-version in GitHub Actions",
       "fileMatch": [
         "\\.github/workflows/.*\\.yml$"
