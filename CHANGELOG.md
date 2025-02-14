@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/SickHub/mailu-operator/compare/v0.2.0...v0.2.1) (2025-02-14)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes packages to v0.32.2 ([#72](https://github.com/SickHub/mailu-operator/issues/72)) ([0dbdd68](https://github.com/SickHub/mailu-operator/commit/0dbdd689d3a59740349164b8433bbe1e41736f24))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.20.2 ([#73](https://github.com/SickHub/mailu-operator/issues/73)) ([9240744](https://github.com/SickHub/mailu-operator/commit/9240744681aa6487eb8e569954ce09f41a07a2a7))
+
 ## [0.2.0](https://github.com/SickHub/mailu-operator/compare/v0.1.2...v0.2.0) (2025-01-11)
 
 
