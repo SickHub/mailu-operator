@@ -31,5 +31,16 @@
         ".*go-version: (?<currentValue>.*?) # (?<datasource>.*?):(?<depName>.*?)\\n"
       ]
     }
-  ]
+  ],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["patch", "pin", "digest"],
+      "automerge": true
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "automerge": true
+    }
+  ],
+  "platformAutomerge": true
 }
