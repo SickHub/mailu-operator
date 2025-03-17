@@ -17,7 +17,18 @@
         "^Makefile$"
       ],
       "matchStrings": [
-        ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>[^:]*?):(?<depName>[^:]*?):?(?<extractVersion>.*?)\\n"
+        ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>[^:]*?):(?<depName>.*?)\\n"
+      ],
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Update tool versions in Makefile",
+      "fileMatch": [
+        "^Makefile$"
+      ],
+      "matchStrings": [
+        ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>[^:]*?):(?<depName>[^:]*?):(?<extractVersion>.*?)\\n"
       ],
       "versioningTemplate": "semver"
     },
