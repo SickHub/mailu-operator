@@ -28,7 +28,7 @@
         "^Makefile$"
       ],
       "matchStrings": [
-        ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>[^:]*?):(?<depName>[^:]*?):(?<extractVersion>.*?)\\n"
+        ".*_VERSION \\??= (?<currentValue>.*?) # (?<datasource>[^:]*?):(?<depName>[^\\s:]*?):(?<extractVersion>.*?)\\n"
       ],
       "versioningTemplate": "semver"
     },
