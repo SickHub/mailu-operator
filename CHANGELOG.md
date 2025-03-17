@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.1](https://github.com/SickHub/mailu-operator/compare/v0.3.0...v0.3.1) (2025-03-17)
+
+
+### Bug Fixes
+
+* renovate comment for kustomize ([19088cc](https://github.com/SickHub/mailu-operator/commit/19088cc3c0533ab76f0277eb0b6e6cb52bf2a292))
+* renovate envtest using extractVersion ([de03130](https://github.com/SickHub/mailu-operator/commit/de03130b1811a27184c228cf185dec8444d6b15d))
+* renovate envtest using extractVersion ([a99ccfc](https://github.com/SickHub/mailu-operator/commit/a99ccfc83c2dc8fbdbefe085cbcf3d86f6229642))
+* renovate envtest using extractVersion ([d935ea6](https://github.com/SickHub/mailu-operator/commit/d935ea6d31662ab65be3923802a200b99b748426))
+* separate regex ([42b7581](https://github.com/SickHub/mailu-operator/commit/42b75815f15687180fbbd1640f5dfe88cabce932))
+* separate regex for extractVersion ([cd73a31](https://github.com/SickHub/mailu-operator/commit/cd73a316400b779986b25dafc96b76e4f222e0e4))
+* separate regex for extractVersion ([2da9c47](https://github.com/SickHub/mailu-operator/commit/2da9c4711c2389ab099f9f9f902f9c4c314f4fe3))
+
 ## [0.3.0](https://github.com/SickHub/mailu-operator/compare/v0.2.0...v0.3.0) (2025-03-13)
 
 
