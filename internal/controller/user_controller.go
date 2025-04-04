@@ -59,10 +59,10 @@ func (r *UserReconciler) Reconcile(ctx context.Context, user *operatorv1alpha1.U
 
 	// apply patches at the end, before returning
 	defer func() {
-		if err := r.Client.Patch(ctx, user.DeepCopy(), client.MergeFrom(userOriginal)); err != nil {
+		if err := r.Patch(ctx, user.DeepCopy(), client.MergeFrom(userOriginal)); err != nil {
 			logr.Error(err, "failed to patch resource")
 		}
-		if err := r.Client.Status().Patch(ctx, user.DeepCopy(), client.MergeFrom(userOriginal)); err != nil {
+		if err := r.Status().Patch(ctx, user.DeepCopy(), client.MergeFrom(userOriginal)); err != nil {
 			logr.Error(err, "failed to patch resource status")
 		}
 	}()

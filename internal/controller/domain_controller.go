@@ -53,10 +53,10 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, domain *operatorv1alph
 
 	// apply patches at the end, before returning
 	defer func() {
-		if err := r.Client.Patch(ctx, domain.DeepCopy(), client.MergeFrom(domainOriginal)); err != nil {
+		if err := r.Patch(ctx, domain.DeepCopy(), client.MergeFrom(domainOriginal)); err != nil {
 			logr.Error(err, "failed to patch resource")
 		}
-		if err := r.Client.Status().Patch(ctx, domain.DeepCopy(), client.MergeFrom(domainOriginal)); err != nil {
+		if err := r.Status().Patch(ctx, domain.DeepCopy(), client.MergeFrom(domainOriginal)); err != nil {
 			logr.Error(err, "failed to patch resource status")
 		}
 	}()

@@ -212,7 +212,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
 KUSTOMIZE_VERSION ?= v5.6.0 # github-releases:kubernetes-sigs/kustomize:kustomize/(?<version>.*)
 CONTROLLER_TOOLS_VERSION ?= v0.17.3 # github-releases:kubernetes-sigs/controller-tools
 ENVTEST_VERSION ?= release-0.19 # github-releases:kubernetes-sigs/controller-runtime
-GOLANGCI_LINT_VERSION ?= v1.64.8 # github-releases:golangci/golangci-lint
+GOLANGCI_LINT_VERSION ?= v2.0.2 # github-releases:golangci/golangci-lint
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -232,7 +232,7 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,${GOLANGCI_LINT_VERSION})
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,${GOLANGCI_LINT_VERSION})
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary (ideally with version)

@@ -53,10 +53,10 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, alias *operatorv1alpha1
 
 	// apply patches at the end, before returning
 	defer func() {
-		if err := r.Client.Patch(ctx, alias.DeepCopy(), client.MergeFrom(aliasOriginal)); err != nil {
+		if err := r.Patch(ctx, alias.DeepCopy(), client.MergeFrom(aliasOriginal)); err != nil {
 			logr.Error(err, "failed to patch resource")
 		}
-		if err := r.Client.Status().Patch(ctx, alias.DeepCopy(), client.MergeFrom(aliasOriginal)); err != nil {
+		if err := r.Status().Patch(ctx, alias.DeepCopy(), client.MergeFrom(aliasOriginal)); err != nil {
 			logr.Error(err, "failed to patch resource status")
 		}
 	}()
