@@ -241,7 +241,7 @@ It is generally advised to **create a fork** of the repo and create Pull-Request
 
 1. Build the installer for the release tag:
     ```sh
-    export VERSION=0.3.1 # x-release-please-version
+    export VERSION=0.3.2 # x-release-please-version
     git checkout -b release-$VERSION
     make build-installer
     ```

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.2](https://github.com/SickHub/mailu-operator/compare/v0.3.1...v0.3.2) (2025-04-04)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/onsi/ginkgo/v2 to v2.23.1 ([#88](https://github.com/SickHub/mailu-operator/issues/88)) ([ad4e4a3](https://github.com/SickHub/mailu-operator/commit/ad4e4a314d74120605956ce9d3ea064642a5a0a6))
+* **deps:** update module github.com/onsi/ginkgo/v2 to v2.23.2 ([#90](https://github.com/SickHub/mailu-operator/issues/90)) ([27c0c3a](https://github.com/SickHub/mailu-operator/commit/27c0c3a15dc0e973055d401fcfe3ac51d86109ff))
+* **deps:** update module github.com/onsi/ginkgo/v2 to v2.23.3 ([#92](https://github.com/SickHub/mailu-operator/issues/92)) ([f2126b0](https://github.com/SickHub/mailu-operator/commit/f2126b00fe9c526f85fe8a76762c224dd380fa2d))
+* **deps:** update module github.com/onsi/gomega to v1.36.3 ([#93](https://github.com/SickHub/mailu-operator/issues/93)) ([f4398ae](https://github.com/SickHub/mailu-operator/commit/f4398ae6771fecefd6fdd59f8d6f00335f24d5a5))
+* **deps:** update module github.com/onsi/gomega to v1.37.0 ([#98](https://github.com/SickHub/mailu-operator/issues/98)) ([25fec93](https://github.com/SickHub/mailu-operator/commit/25fec93d45a683bb607863e2cbc6e672ff8530df))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.20.4 ([#95](https://github.com/SickHub/mailu-operator/issues/95)) ([b8d0962](https://github.com/SickHub/mailu-operator/commit/b8d096226dd51a9ed2df3bb85e5e1060ab633570))
+
 ## [0.3.1](https://github.com/SickHub/mailu-operator/compare/v0.3.0...v0.3.1) (2025-03-17)
 
 
