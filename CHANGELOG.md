@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.3](https://github.com/SickHub/mailu-operator/compare/v0.3.2...v0.3.3) (2025-05-07)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes packages to v0.32.4 ([#103](https://github.com/SickHub/mailu-operator/issues/103)) ([19df9a6](https://github.com/SickHub/mailu-operator/commit/19df9a6f6c2d9bf38ed86e6845fc108750b15484))
+* **deps:** update kubernetes packages to v0.33.0 ([#104](https://github.com/SickHub/mailu-operator/issues/104)) ([221265d](https://github.com/SickHub/mailu-operator/commit/221265db4ffbbcdfcedeca769b9155d484b81d5d))
+* **deps:** update module github.com/onsi/ginkgo/v2 to v2.23.4 ([#99](https://github.com/SickHub/mailu-operator/issues/99)) ([1a82972](https://github.com/SickHub/mailu-operator/commit/1a82972cae82ddcb3a9e4c0b39238be221fe2a50))
+
 ## [0.3.2](https://github.com/SickHub/mailu-operator/compare/v0.3.1...v0.3.2) (2025-04-04)
 
 
