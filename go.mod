@@ -2,7 +2,7 @@ module github.com/sickhub/mailu-operator
 
 go 1.24.0
 
-toolchain go1.24.4
+toolchain go1.24.5
 
 require (
 	github.com/oapi-codegen/runtime v1.1.1
