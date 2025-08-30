@@ -79,7 +79,7 @@ var _ = Describe("User Controller", func() {
 				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
 				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, UserConditionTypeReady)).To(BeFalse())
-				Expect(result.Requeue).To(BeTrue())
+				Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 			})
 
 			It("creates the user, updates status and adds a finalizer", func() {
@@ -104,7 +104,7 @@ var _ = Describe("User Controller", func() {
 
 				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
 				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
-				Expect(result.Requeue).To(BeTrue())
+				Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, UserConditionTypeReady)).To(BeTrue())
 			})
 
@@ -132,7 +132,7 @@ var _ = Describe("User Controller", func() {
 				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
 				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, UserConditionTypeReady)).To(BeFalse())
-				Expect(result.Requeue).To(BeTrue())
+				Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 			})
 		})
 
@@ -186,7 +186,7 @@ var _ = Describe("User Controller", func() {
 
 				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment + "1"))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, UserConditionTypeReady)).To(BeFalse())
-				Expect(result.Requeue).To(BeTrue())
+				Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 			})
 		})
 

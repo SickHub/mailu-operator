@@ -70,7 +70,7 @@ func (r *DomainReconciler) Reconcile(ctx context.Context, domain *operatorv1alph
 		return result, err
 	}
 
-	if domainOriginal.DeletionTimestamp != nil && !result.Requeue {
+	if domainOriginal.DeletionTimestamp != nil && result.RequeueAfter == 0 {
 		controllerutil.RemoveFinalizer(domain, FinalizerName)
 	}
 
@@ -95,7 +95,7 @@ func (r *DomainReconciler) reconcile(ctx context.Context, domain *operatorv1alph
 	if err != nil {
 		if retry {
 			logr.Info(fmt.Errorf("failed to get domain, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		// we explicitly set the error in the status only on a permanent (non-retryable) error
 		meta.SetStatusCondition(&domain.Status.Conditions, getDomainReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
@@ -126,18 +126,20 @@ func (r *DomainReconciler) create(ctx context.Context, domain *operatorv1alpha1.
 		meta.SetStatusCondition(&domain.Status.Conditions, getDomainReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to create domain, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to create domain")
 		return ctrl.Result{}, err
 	}
 
-	if !retry {
-		meta.SetStatusCondition(&domain.Status.Conditions, getDomainReadyCondition(metav1.ConditionTrue, "Created", "Domain created in MailU"))
-		logr.Info("created domain")
+	if retry {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	return ctrl.Result{Requeue: retry}, nil
+	meta.SetStatusCondition(&domain.Status.Conditions, getDomainReadyCondition(metav1.ConditionTrue, "Created", "Domain created in MailU"))
+	logr.Info("created domain")
+
+	return ctrl.Result{}, nil
 }
 
 func (r *DomainReconciler) update(ctx context.Context, domain *operatorv1alpha1.Domain, apiDomain *mailu.Domain) (ctrl.Result, error) {
@@ -167,18 +169,20 @@ func (r *DomainReconciler) update(ctx context.Context, domain *operatorv1alpha1.
 		meta.SetStatusCondition(&domain.Status.Conditions, getDomainReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to update domain, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to update domain")
 		return ctrl.Result{}, err
 	}
 
-	if !retry {
-		meta.SetStatusCondition(&domain.Status.Conditions, getDomainReadyCondition(metav1.ConditionTrue, "Updated", "Domain updated in MailU"))
-		logr.Info("updated domain")
+	if retry {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	return ctrl.Result{Requeue: retry}, nil
+	meta.SetStatusCondition(&domain.Status.Conditions, getDomainReadyCondition(metav1.ConditionTrue, "Updated", "Domain updated in MailU"))
+	logr.Info("updated domain")
+
+	return ctrl.Result{}, nil
 }
 
 func (r *DomainReconciler) delete(ctx context.Context, domain *operatorv1alpha1.Domain) (ctrl.Result, error) {
@@ -189,17 +193,18 @@ func (r *DomainReconciler) delete(ctx context.Context, domain *operatorv1alpha1.
 		meta.SetStatusCondition(&domain.Status.Conditions, getDomainReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to delete domain, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to delete domain")
 		return ctrl.Result{}, err
 	}
 
-	if !retry {
-		logr.Info("deleted domain")
+	if retry {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	return ctrl.Result{Requeue: retry}, nil
+	logr.Info("deleted domain")
+	return ctrl.Result{}, nil
 }
 
 func (r *DomainReconciler) getDomain(ctx context.Context, domain *operatorv1alpha1.Domain) (*mailu.Domain, bool, error) {

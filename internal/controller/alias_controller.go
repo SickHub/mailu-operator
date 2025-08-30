@@ -70,7 +70,7 @@ func (r *AliasReconciler) Reconcile(ctx context.Context, alias *operatorv1alpha1
 		return result, err
 	}
 
-	if aliasOriginal.DeletionTimestamp != nil && !result.Requeue {
+	if aliasOriginal.DeletionTimestamp != nil && result.RequeueAfter == 0 {
 		controllerutil.RemoveFinalizer(alias, FinalizerName)
 	}
 
@@ -95,7 +95,7 @@ func (r *AliasReconciler) reconcile(ctx context.Context, alias *operatorv1alpha1
 	if err != nil {
 		if retry {
 			logr.Info(fmt.Errorf("failed to get alias, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		// we explicitly set the error in the status only on a permanent (non-retryable) error
 		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
@@ -126,18 +126,20 @@ func (r *AliasReconciler) create(ctx context.Context, alias *operatorv1alpha1.Al
 		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to create alias, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to create alias")
 		return ctrl.Result{}, err
 	}
 
-	if !retry {
-		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Created", "Alias created in MailU"))
-		logr.Info("created alias")
+	if retry {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	return ctrl.Result{Requeue: retry}, nil
+	meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Created", "Alias created in MailU"))
+	logr.Info("created alias")
+
+	return ctrl.Result{}, nil
 }
 
 func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Alias, apiAlias *mailu.Alias) (ctrl.Result, error) {
@@ -164,18 +166,20 @@ func (r *AliasReconciler) update(ctx context.Context, alias *operatorv1alpha1.Al
 		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to update alias, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to update alias")
 		return ctrl.Result{}, err
 	}
 
-	if !retry {
-		logr.Info("updated alias")
-		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
+	if retry {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	return ctrl.Result{Requeue: retry}, nil
+	logr.Info("updated alias")
+	meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionTrue, "Updated", "Alias updated in MailU"))
+
+	return ctrl.Result{}, nil
 }
 
 func (r *AliasReconciler) delete(ctx context.Context, alias *operatorv1alpha1.Alias) (ctrl.Result, error) {
@@ -186,17 +190,19 @@ func (r *AliasReconciler) delete(ctx context.Context, alias *operatorv1alpha1.Al
 		meta.SetStatusCondition(&alias.Status.Conditions, getAliasReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to delete alias, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to delete alias")
 		return ctrl.Result{}, err
 	}
 
-	if !retry {
-		logr.Info("deleted alias")
+	if retry {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	return ctrl.Result{Requeue: retry}, nil
+	logr.Info("deleted alias")
+
+	return ctrl.Result{}, nil
 }
 
 func (r *AliasReconciler) getAlias(ctx context.Context, alias *operatorv1alpha1.Alias) (*mailu.Alias, bool, error) {
