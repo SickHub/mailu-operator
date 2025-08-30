@@ -76,7 +76,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, user *operatorv1alpha1.U
 		return result, err
 	}
 
-	if userOriginal.DeletionTimestamp != nil && !result.Requeue {
+	if userOriginal.DeletionTimestamp != nil && result.RequeueAfter == 0 {
 		controllerutil.RemoveFinalizer(user, FinalizerName)
 	}
 
@@ -101,7 +101,7 @@ func (r *UserReconciler) reconcile(ctx context.Context, user *operatorv1alpha1.U
 	if err != nil {
 		if retry {
 			logr.Info(fmt.Errorf("failed to get user, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		// we explicitly set the error in the status only on a permanent (non-retryable) error
 		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
@@ -132,18 +132,20 @@ func (r *UserReconciler) create(ctx context.Context, user *operatorv1alpha1.User
 		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to create user, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to create user")
 		return ctrl.Result{}, err
 	}
 
-	if !retry {
-		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Created", "User created in MailU"))
-		logr.Info("created user")
+	if retry {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	return ctrl.Result{Requeue: retry}, nil
+	meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Created", "User created in MailU"))
+	logr.Info("created user")
+
+	return ctrl.Result{}, nil
 }
 
 func (r *UserReconciler) update(ctx context.Context, user *operatorv1alpha1.User, apiUser *mailu.User) (ctrl.Result, error) {
@@ -175,18 +177,20 @@ func (r *UserReconciler) update(ctx context.Context, user *operatorv1alpha1.User
 		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to update user, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to update user")
 		return ctrl.Result{}, err
 	}
 
-	if !retry {
-		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Updated", "User updated in MailU"))
-		logr.Info("updated user")
+	if retry {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	return ctrl.Result{Requeue: retry}, nil
+	meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionTrue, "Updated", "User updated in MailU"))
+	logr.Info("updated user")
+
+	return ctrl.Result{}, nil
 }
 
 func (r *UserReconciler) delete(ctx context.Context, user *operatorv1alpha1.User) (ctrl.Result, error) {
@@ -197,17 +201,19 @@ func (r *UserReconciler) delete(ctx context.Context, user *operatorv1alpha1.User
 		meta.SetStatusCondition(&user.Status.Conditions, getUserReadyCondition(metav1.ConditionFalse, "Error", err.Error()))
 		if retry {
 			logr.Info(fmt.Errorf("failed to delete user, requeueing: %w", err).Error())
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		logr.Error(err, "failed to delete user")
 		return ctrl.Result{}, err
 	}
 
-	if !retry {
-		logr.Info("deleted user")
+	if retry {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	return ctrl.Result{Requeue: retry}, nil
+	logr.Info("deleted user")
+
+	return ctrl.Result{}, nil
 }
 
 func (r *UserReconciler) getUser(ctx context.Context, user *operatorv1alpha1.User) (*mailu.User, bool, error) {

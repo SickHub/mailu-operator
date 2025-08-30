@@ -79,7 +79,7 @@ var _ = Describe("Alias Controller", func() {
 				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
 				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
-				Expect(result.Requeue).To(BeTrue())
+				Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 			})
 
 			It("creates the alias, updates status and adds a finalizer", func() {
@@ -104,7 +104,7 @@ var _ = Describe("Alias Controller", func() {
 
 				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
 				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
-				Expect(result.Requeue).To(BeTrue())
+				Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeTrue())
 			})
 
@@ -115,7 +115,7 @@ var _ = Describe("Alias Controller", func() {
 				_, err := reconcile(false)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(result.Requeue).To(BeFalse())
+				Expect(result.RequeueAfter).To(BeNumerically("==", 0))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
 				condition := meta.FindStatusCondition(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)
 				Expect(condition.Reason).To(Equal("Error"))
@@ -132,7 +132,7 @@ var _ = Describe("Alias Controller", func() {
 				Expect(resAfterReconciliation.GetFinalizers()).To(HaveLen(1))
 				Expect(resAfterReconciliation.Status.Conditions).To(HaveLen(1))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
-				Expect(result.Requeue).To(BeTrue())
+				Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 			})
 		})
 
@@ -186,7 +186,7 @@ var _ = Describe("Alias Controller", func() {
 
 				Expect(resAfterReconciliation.Spec.Comment).To(Equal(mockComment + "1"))
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
-				Expect(result.Requeue).To(BeTrue())
+				Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 			})
 		})
 
@@ -208,7 +208,7 @@ var _ = Describe("Alias Controller", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(meta.IsStatusConditionTrue(resAfterReconciliation.Status.Conditions, AliasConditionTypeReady)).To(BeFalse())
-				Expect(result.Requeue).To(BeTrue())
+				Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 			})
 
 			It("deletes the alias", func() {
