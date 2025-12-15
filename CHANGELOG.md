@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.4](https://github.com/SickHub/mailu-operator/compare/v0.3.3...v0.3.4) (2025-12-15)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes packages to v0.34.1 ([#140](https://github.com/SickHub/mailu-operator/issues/140)) ([bc9884f](https://github.com/SickHub/mailu-operator/commit/bc9884fe8deeb522562d9f2546ac940b7a3a24d2))
+* **deps:** update kubernetes packages to v0.34.2 ([#151](https://github.com/SickHub/mailu-operator/issues/151)) ([a694157](https://github.com/SickHub/mailu-operator/commit/a694157cbb82f4d85e77a6f6af45684ce658e612))
+* **deps:** update kubernetes packages to v0.34.3 ([#156](https://github.com/SickHub/mailu-operator/issues/156)) ([429b00a](https://github.com/SickHub/mailu-operator/commit/429b00a3594a7bae86538da751721fa3819cb24c))
+* **deps:** update module github.com/onsi/ginkgo/v2 to v2.25.3 ([#137](https://github.com/SickHub/mailu-operator/issues/137)) ([40c6352](https://github.com/SickHub/mailu-operator/commit/40c6352520e4ae76bad797f1221c778f30711655))
+* **deps:** update module github.com/onsi/ginkgo/v2 to v2.27.3 ([#143](https://github.com/SickHub/mailu-operator/issues/143)) ([6fc8d08](https://github.com/SickHub/mailu-operator/commit/6fc8d0831e02a3943a3fc1e1d35fcc4e02caac9d))
+* **deps:** update module github.com/onsi/gomega to v1.38.3 ([#155](https://github.com/SickHub/mailu-operator/issues/155)) ([ca9ab48](https://github.com/SickHub/mailu-operator/commit/ca9ab48bc5bd91d47565a3e4e08408d9bbedd082))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.22.1 ([#139](https://github.com/SickHub/mailu-operator/issues/139)) ([2c70827](https://github.com/SickHub/mailu-operator/commit/2c708279dc034fa60b7a30475b230621343b7f2a))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.22.2 ([#144](https://github.com/SickHub/mailu-operator/issues/144)) ([594494a](https://github.com/SickHub/mailu-operator/commit/594494aa80a5da0e0f96fd41db543847fedb425b))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.22.3 ([#146](https://github.com/SickHub/mailu-operator/issues/146)) ([1adf1c6](https://github.com/SickHub/mailu-operator/commit/1adf1c6e7cc9bb8a5d72dd92ace4c2674a02accd))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.22.4 ([#149](https://github.com/SickHub/mailu-operator/issues/149)) ([aa925a4](https://github.com/SickHub/mailu-operator/commit/aa925a465bddab441eac1045dacdd2121e605f8a))
+
 ## [0.3.3](https://github.com/SickHub/mailu-operator/compare/v0.3.2...v0.3.3) (2025-08-30)
 
 
