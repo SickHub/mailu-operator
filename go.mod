@@ -6,7 +6,7 @@ toolchain go1.25.5
 
 require (
 	github.com/oapi-codegen/runtime v1.1.2
-	github.com/onsi/ginkgo/v2 v2.27.3
+	github.com/onsi/ginkgo/v2 v2.27.4
 	github.com/onsi/gomega v1.38.3
 	github.com/sethvargo/go-password v0.3.1
 	k8s.io/api v0.34.3
