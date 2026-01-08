@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.5](https://github.com/SickHub/mailu-operator/compare/v0.3.4...v0.3.5) (2026-01-08)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/onsi/ginkgo/v2 to v2.27.4 ([#161](https://github.com/SickHub/mailu-operator/issues/161)) ([5c1ab27](https://github.com/SickHub/mailu-operator/commit/5c1ab27868763201ecc73d2b8a9321c548ec763e))
+
 ## [0.3.4](https://github.com/SickHub/mailu-operator/compare/v0.3.3...v0.3.4) (2025-12-15)
 
 
