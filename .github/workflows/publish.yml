@@ -20,7 +20,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v6
         with:
-          go-version: 1.25.6 # golang-version:go
+          go-version: 1.25.7 # golang-version:go
           check-latest: true
 
       - name: OCI Metadata for multi-arch image
