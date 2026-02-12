@@ -23,7 +23,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v6
         with:
-          go-version: 1.25.7 # golang-version:go
+          go-version: 1.26.0 # golang-version:go
           check-latest: true
 
       - name: Initialize CodeQL
