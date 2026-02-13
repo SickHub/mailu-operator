@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.6](https://github.com/SickHub/mailu-operator/compare/v0.3.5...v0.3.6) (2026-02-13)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes packages to v0.35.1 ([#171](https://github.com/SickHub/mailu-operator/issues/171)) ([4b17d40](https://github.com/SickHub/mailu-operator/commit/4b17d40f6ac000495a676591435855d869cf6b9e))
+
 ## [0.3.5](https://github.com/SickHub/mailu-operator/compare/v0.3.4...v0.3.5) (2026-01-31)
 
 
