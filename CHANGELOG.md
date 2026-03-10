@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.6](https://github.com/SickHub/mailu-operator/compare/v0.3.5...v0.3.6) (2026-03-10)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes packages to v0.35.1 ([#171](https://github.com/SickHub/mailu-operator/issues/171)) ([4b17d40](https://github.com/SickHub/mailu-operator/commit/4b17d40f6ac000495a676591435855d869cf6b9e))
+* **deps:** update kubernetes packages to v0.35.2 ([#177](https://github.com/SickHub/mailu-operator/issues/177)) ([e440fd8](https://github.com/SickHub/mailu-operator/commit/e440fd88ada9d2a836fe284f97b7338f97233d26))
+* **deps:** update module github.com/oapi-codegen/runtime to v1.2.0 ([#176](https://github.com/SickHub/mailu-operator/issues/176)) ([81c0030](https://github.com/SickHub/mailu-operator/commit/81c00305e1c48a3e1696191cb17ae68fed882463))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.23.2 ([#180](https://github.com/SickHub/mailu-operator/issues/180)) ([cebd61a](https://github.com/SickHub/mailu-operator/commit/cebd61a98af58bee58127350afffa77073c5f015))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.23.3 ([#182](https://github.com/SickHub/mailu-operator/issues/182)) ([f792d6b](https://github.com/SickHub/mailu-operator/commit/f792d6b444d90bc1be8b1c848901f2651a35a174))
+
 ## [0.3.5](https://github.com/SickHub/mailu-operator/compare/v0.3.4...v0.3.5) (2026-01-31)
 
 
