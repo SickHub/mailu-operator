@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.6](https://github.com/SickHub/mailu-operator/compare/v0.3.5...v0.3.6) (2026-04-29)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes monorepo to v0.35.3 ([#188](https://github.com/SickHub/mailu-operator/issues/188)) ([553ecd9](https://github.com/SickHub/mailu-operator/commit/553ecd9bd33ced3802d8d355ea626cb7192bf13b))
+* **deps:** update kubernetes monorepo to v0.35.4 ([#192](https://github.com/SickHub/mailu-operator/issues/192)) ([3af238d](https://github.com/SickHub/mailu-operator/commit/3af238de37a1267dd23bd90cd04e83be6aa3dac6))
+* **deps:** update kubernetes packages to v0.35.1 ([#171](https://github.com/SickHub/mailu-operator/issues/171)) ([4b17d40](https://github.com/SickHub/mailu-operator/commit/4b17d40f6ac000495a676591435855d869cf6b9e))
+* **deps:** update kubernetes packages to v0.35.2 ([#177](https://github.com/SickHub/mailu-operator/issues/177)) ([e440fd8](https://github.com/SickHub/mailu-operator/commit/e440fd88ada9d2a836fe284f97b7338f97233d26))
+* **deps:** update module github.com/oapi-codegen/runtime to v1.2.0 ([#176](https://github.com/SickHub/mailu-operator/issues/176)) ([81c0030](https://github.com/SickHub/mailu-operator/commit/81c00305e1c48a3e1696191cb17ae68fed882463))
+* **deps:** update module github.com/onsi/ginkgo/v2 to v2.28.2 ([#195](https://github.com/SickHub/mailu-operator/issues/195)) ([6713284](https://github.com/SickHub/mailu-operator/commit/6713284177b5a0b0750cb2d985f7eb4170ff700a))
+* **deps:** update module github.com/onsi/ginkgo/v2 to v2.28.3 ([#197](https://github.com/SickHub/mailu-operator/issues/197)) ([e40cb8e](https://github.com/SickHub/mailu-operator/commit/e40cb8e8f1bdc0084996c3304390ece3401dedda))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.23.2 ([#180](https://github.com/SickHub/mailu-operator/issues/180)) ([cebd61a](https://github.com/SickHub/mailu-operator/commit/cebd61a98af58bee58127350afffa77073c5f015))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.23.3 ([#182](https://github.com/SickHub/mailu-operator/issues/182)) ([f792d6b](https://github.com/SickHub/mailu-operator/commit/f792d6b444d90bc1be8b1c848901f2651a35a174))
+
 ## [0.3.5](https://github.com/SickHub/mailu-operator/compare/v0.3.4...v0.3.5) (2026-01-31)
 
 
