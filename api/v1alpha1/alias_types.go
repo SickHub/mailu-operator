@@ -62,7 +62,3 @@ type AliasList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Alias `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&Alias{}, &AliasList{})
-}
