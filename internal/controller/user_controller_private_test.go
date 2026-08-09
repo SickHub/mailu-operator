@@ -15,6 +15,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const (
+	defaultNamespace = "default"
+	secretName       = "secret"
+	testName         = "test"
+	testDomain       = "test.com"
+)
+
 func TestUserReconciler_getRawUserPassword(t *testing.T) {
 	type fields struct {
 		Client    client.Client
@@ -29,13 +36,13 @@ func TestUserReconciler_getRawUserPassword(t *testing.T) {
 	}
 
 	k8sClient := fake.NewClientBuilder().Build()
-	k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}})
+	k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: defaultNamespace}})
 	passworB64 := make([]byte, base64.StdEncoding.EncodedLen(8))
 	base64.StdEncoding.Encode(passworB64, []byte("password"))
 	k8sClient.Create(context.Background(), &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "secret",
-			Namespace: "default",
+			Name:      secretName,
+			Namespace: defaultNamespace,
 		},
 		Data: map[string][]byte{
 			"password": passworB64,
@@ -62,8 +69,8 @@ func TestUserReconciler_getRawUserPassword(t *testing.T) {
 				ctx: context.Background(),
 				user: &operatorv1alpha1.User{
 					Spec: operatorv1alpha1.UserSpec{
-						Name:   "test",
-						Domain: "test.com",
+						Name:   testName,
+						Domain: testDomain,
 					},
 				},
 			},
@@ -83,8 +90,8 @@ func TestUserReconciler_getRawUserPassword(t *testing.T) {
 				ctx: context.Background(),
 				user: &operatorv1alpha1.User{
 					Spec: operatorv1alpha1.UserSpec{
-						Name:           "test",
-						Domain:         "test.com",
+						Name:           testName,
+						Domain:         testDomain,
 						PasswordSecret: "foo",
 						PasswordKey:    "bar",
 					},
@@ -107,12 +114,12 @@ func TestUserReconciler_getRawUserPassword(t *testing.T) {
 				user: &operatorv1alpha1.User{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "testUser",
-						Namespace: "default",
+						Namespace: defaultNamespace,
 					},
 					Spec: operatorv1alpha1.UserSpec{
-						Name:           "test",
-						Domain:         "test.com",
-						PasswordSecret: "secret",
+						Name:           testName,
+						Domain:         testDomain,
+						PasswordSecret: secretName,
 						PasswordKey:    "password",
 					},
 				},
@@ -134,12 +141,12 @@ func TestUserReconciler_getRawUserPassword(t *testing.T) {
 				user: &operatorv1alpha1.User{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "testUser",
-						Namespace: "default",
+						Namespace: defaultNamespace,
 					},
 					Spec: operatorv1alpha1.UserSpec{
-						Name:           "test",
-						Domain:         "test.com",
-						PasswordSecret: "secret",
+						Name:           testName,
+						Domain:         testDomain,
+						PasswordSecret: secretName,
 						PasswordKey:    "non-existent",
 					},
 				},
