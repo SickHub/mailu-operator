@@ -16,6 +16,7 @@ const (
 	mockName    = "foo"
 	mockDomain  = "example.com"
 	mockComment = "some comment"
+	defaultNS   = "default"
 )
 
 var (
@@ -33,19 +34,19 @@ func CreateResource(obj interface{}, name, domain string) client.Object {
 	switch obj.(type) {
 	case operatorv1alpha1.Alias:
 		return &operatorv1alpha1.Alias{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: defaultNS},
 			Spec: operatorv1alpha1.AliasSpec{
 				Name: name, Domain: domain, Destination: []string{"dest-" + name + "@" + domain},
 			},
 		}
 	case operatorv1alpha1.User:
 		return &operatorv1alpha1.User{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: defaultNS},
 			Spec:       operatorv1alpha1.UserSpec{Name: name, Domain: domain, RawPassword: name + "-password"},
 		}
 	case operatorv1alpha1.Domain:
 		return &operatorv1alpha1.Domain{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: defaultNS},
 			Spec:       operatorv1alpha1.DomainSpec{Name: domain},
 		}
 	default:
