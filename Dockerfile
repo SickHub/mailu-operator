@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.26 AS builder
+FROM golang:1.27 AS builder
 LABEL org.opencontainers.image.authors="drpsychick@drsick.net"
 LABEL org.opencontainers.image.description="Kubernetes operator for Mailu self-hosted mail server"
 LABEL org.opencontainers.image.source="https://github.com/SickHub/mailu-operator"
